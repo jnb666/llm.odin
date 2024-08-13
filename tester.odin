@@ -20,6 +20,7 @@ Test_Options :: struct{
 	verbose: bool `usage:"show verbose output"`,
 	quiet: bool `usage:"suppress differences if ok"`,
 	steps: int `usage:"number of test steps"`,
+	recompute: bool `usage:"recompute Gelu activations to save memory"`
 }
 
 Debug_State :: struct{
@@ -62,6 +63,8 @@ test_start :: proc($Device, $Type: typeid, opt: ^Test_Options) {
 		fatal_error("Error loading %s: %v", model_file, err)
 	}
 	defer gpt2.delete_model(model)
+	model.recompute_gelu = opt.recompute
+	log.info(model.config)
 
 	state: ^Debug_State
 	state, err = load_debug_state(opt.debug_state, opt.loss_file, model.config)

@@ -4,6 +4,7 @@ import "core:io"
 import "core:os"
 import "core:log"
 import "core:math/rand"
+import "core:path/filepath"
 
 import "../array"
 import "../util"
@@ -40,7 +41,7 @@ read_dataset :: proc($Device: typeid, file_name: string, batch_size, seq_length:
 		log.errorf("expecting file size of %d - got %d", exp_bytes, file_bytes)
 		return nil, .Invalid_File
 	}
-	log.infof("read %d tokens from %s", length, file_name)
+	log.debugf("read %d tokens from %s", length, file_name)
 	_ = os.seek(file, 0, os.SEEK_SET) or_return
 	d = new(Dataset(Device))
 	d.tokens = make([]u16, length)
@@ -50,6 +51,7 @@ read_dataset :: proc($Device: typeid, file_name: string, batch_size, seq_length:
 	d.inputs = array.zeros(Device, i32, {batch_size, seq_length})
 	d.targets = array.zeros(Device, i32, {batch_size, seq_length})
 	d.shuffle = shuffle
+	log.infof("%s: %d x [%d %d] batches, shuffle=%v", filepath.base(file_name), length/(batch_size*seq_length), batch_size, seq_length, shuffle)
 	return d, nil
 }
 

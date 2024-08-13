@@ -19,7 +19,6 @@ load_checkpoint :: proc($Device, $Type: typeid, file_name: string) -> (model: ^M
 	defer os.close(file)
 	r := os.stream_from_handle(file)
 	cfg, version := read_checkpoint_header(r) or_return
-	log.debugf("version = %d\n%v", version, cfg)
 	model = new_model(Device, Type, cfg)
 	if version == Checkpoint_Version_BF16 {
 		load_parameters(BF16, r, model) or_return

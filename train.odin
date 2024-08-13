@@ -34,6 +34,7 @@ Train_Options :: struct{
 	learn_rate: f32 `usage:"AdamW learning rate parameter"`,
 	weight_decay: f32 `usage:"AdamW weight decay parameter"`,
 	grad_clip: f32 `usage:"AdamW gradient clip parameter"`,
+	recompute: bool `usage:"recompute Gelu activations to save memory"`
 }
 
 // run test training session to compare model outputs with saved pytorch reference
@@ -80,6 +81,8 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 		log.fatalf("requested seqlen=%d is greater than model max_seq=%d", opt.seq_len, model.max_seq)
 		os.exit(1)
 	}
+	model.recompute_gelu = opt.recompute
+	log.info(model.config)
 	gpt2.build(model, opt.batch, opt.seq_len)
 	if opt.verbose {
 		nn.write_summary(stdout, &model.layer)
@@ -143,6 +146,7 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 }
 
 sample_text :: proc(model: ^gpt2.Model($D, $T), tokenizer: ^gpt2.Tokenizer, opt: ^Train_Options) {
+	log.debug("sample text")
 	fmt.println()
 	tokenizer := tokenizer
 	sampler := nn.Sampler{ temperature=opt.temperature, top_k=opt.top_k, top_p=opt.top_p }

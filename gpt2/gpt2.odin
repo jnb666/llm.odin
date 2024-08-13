@@ -16,7 +16,7 @@ BF16 :: array.BF16
 CPU :: array.CPU
 Cuda :: array.Cuda
 
-// GPT2 coniguration 
+// GPT2 configuration 
 Config :: struct {
 	num_layers: int,
 	num_heads: int,
@@ -25,6 +25,7 @@ Config :: struct {
 	vocab_size: int,
 	vocab_padded: int,
 	no_bias: bool,
+	recompute_gelu: bool,
 }
 
 // Pad size of vocabulary - used for embedding wte parameter and logits array
@@ -63,7 +64,7 @@ new_model :: proc($D, $T: typeid, cfg: Config) -> ^Model(D, T) {
 	m.layers[0] = &m.embed.layer
 	m.blocks = make([]^Transformer(D, T), cfg.num_layers)
 	for i in 0 ..< cfg.num_layers {
-		m.blocks[i] = make_transformer(D, T, cfg, i)
+		m.blocks[i] = make_transformer(D, T, &m.config, i)
 		m.layers[i+1] = &m.blocks[i].layer
 	}
 	m.norm3 = nn.make_layernorm(D, T, "norm3", cfg.channels)
@@ -130,6 +131,10 @@ forward :: proc(m: ^Model($Dev, $Typ), inp: Array(Dev, i32), train := true, loc 
 		x = m.act.feed_forward[i]
 	}
 	nn.layernorm_forward(&m.norm3, x, m.act.final_norm, train)
+	if m.act.logits.ndims != 3 || m.act.logits.dims[0] != B || m.act.logits.dims[1] != T {
+		array.delete(m.act.logits)
+		m.act.logits = array.zeros(Dev, Typ, {B, T, m.vocab_padded})
+	}
 	nn.linear_forward(&m.rev_embed, m.act.final_norm, m.act.logits)
 	m.act.have_dlogits = false
 }
@@ -151,6 +156,8 @@ backward :: proc(m: ^Model($Dev, $Typ), inp: Array(Dev, i32), loc := #caller_loc
 	tmp1 := array.zeros_like(m.act.encoded)
 	defer array.delete(tmp1)
 	nn.linear_backward(&m.rev_embed, m.act.final_norm, m.act.logits, tmp1)
+	array.delete(m.act.logits)
+	m.act.logits = {}
 	tmp2 := m.act.final_norm
 	array.zero(tmp2)
 	nn.layernorm_backward(&m.norm3, m.act.feed_forward[m.num_layers-1], tmp1, tmp2)
@@ -165,7 +172,8 @@ backward :: proc(m: ^Model($Dev, $Typ), inp: Array(Dev, i32), loc := #caller_loc
 // Generate output tokens from the model using the given sampler and initial prompt tokens.
 // Will exit after either max_length tokens are generated or the stop_token is received.
 // Calls fn after generating each token
-generate :: proc(m: ^Model($Dev, $Typ), sampler: nn.Sampler, ctx: rawptr, fn: proc(ctx: rawptr, token: u16, done: bool), prompt: []u16, max_length := 256, stop_token := -1, loc := #caller_location) {
+generate :: proc(m: ^Model($Dev, $Typ), sampler: nn.Sampler, ctx: rawptr, fn: proc(ctx: rawptr, token: u16, done: bool), prompt: []u16, 
+										max_length := 256, stop_token := -1, loc := #caller_location) {
 	assert(len(prompt) < m.max_seq, "prompt is too long", loc)
 	assert(max_length <= m.max_seq, "max length exceeds model sequence length", loc)
 
@@ -182,7 +190,6 @@ generate :: proc(m: ^Model($Dev, $Typ), sampler: nn.Sampler, ctx: rawptr, fn: pr
 	done := false
 	for !done {
 		array.copy(input, tokens)
-		//log.debugf("t=%d input=%v:", t, input)
 		forward(m, input, train=false)
 		output := array.view(m.act.logits, {m.vocab_size}, offset=(t-1)*m.vocab_padded)
 		array.copy(logits, output)
@@ -207,7 +214,6 @@ build :: proc(m: ^Model($Dev, $Typ), input_shape: ..int, loc := #caller_location
 		m.act.feed_forward[i] = array.zeros(Dev, Typ, {B, T, C})
 	}
 	m.act.final_norm = array.zeros(Dev, Typ, {B, T, C})
-	m.act.logits = array.zeros(Dev, Typ, {B, T, m.vocab_padded})
 	m.act.losses = array.zeros(Dev, f32, {B, T})
 }
 
@@ -225,7 +231,6 @@ delete_activations :: proc(act: ^Activations($D, $T)) {
 	}
 	delete(act.feed_forward)
 	array.delete(act.final_norm)
-	array.delete(act.logits)
 	array.delete(act.losses)
 }
 
@@ -244,6 +249,7 @@ delete_model :: proc(m: ^Model($D, $T)) {
 
 // Transformer block with multi-head self attention.
 Transformer :: struct($D, $T: typeid) {
+	using config: ^Config,
 	using layer: nn.Layer(D, T),
 	norm1: nn.Layernorm(D, T),
 	pre_att: nn.Linear(D, T),
@@ -265,13 +271,14 @@ Transformer_Activations :: struct($D, $T: typeid) {
 	ff_gelu: Array(D, T),
 }
 
-make_transformer :: proc($D, $T: typeid, cfg: Config, layer: int) -> ^Transformer(D, T) {
+make_transformer :: proc($D, $T: typeid, cfg: ^Config, layer: int) -> ^Transformer(D, T) {
 	name :: proc(b: []u8, ix: int, s: string) -> string {
 		return fmt.bprintf(b, "%d.%s", ix, s)
 	}
 	buf: [128]u8
 	bias := !cfg.no_bias
 	t := new(Transformer(D, T))
+	t.config = cfg
 	t.norm1 = nn.make_layernorm(D, T, name(buf[:], layer, "norm1"), cfg.channels)
 	t.pre_att = nn.make_linear(D, T, name(buf[:], layer, "pre_att"), cfg.channels, 3*cfg.channels, bias=bias)
 	t.attn = nn.make_attention(D, T, name(buf[:], layer, "attn"), cfg.num_heads, cfg.channels)
@@ -306,8 +313,15 @@ transformer_forward :: proc(t: ^Transformer($Dev, $Typ), inp, out: Array(Dev, Ty
 	nn.add(inp, tmp, t.act.res)
 	nn.layernorm_forward(&t.norm2, t.act.res, t.act.norm2, train)
 	nn.linear_forward(&t.ff, t.act.norm2, t.act.ff_out)
-	nn.gelu_forward(t.act.ff_out, t.act.ff_gelu)
-	nn.linear_forward(&t.ff_proj, t.act.ff_gelu, tmp)
+	ff_gelu := t.act.ff_gelu
+	if t.recompute_gelu {
+		ff_gelu = array.zeros(Dev, Typ, {B, T, 4*C})
+	}
+	nn.gelu_forward(t.act.ff_out, ff_gelu)
+	nn.linear_forward(&t.ff_proj, ff_gelu, tmp)
+	if t.recompute_gelu {
+		array.delete(ff_gelu)
+	}
 	nn.add(t.act.res, tmp, out)
 }
 
@@ -316,7 +330,15 @@ transformer_backward :: proc(t: ^Transformer($Dev, $Typ), inp, dout, din: Array(
 	tmp1 := array.zeros(Dev, Typ, {B, T, 4*C})
 	defer array.delete(tmp1)
 	array.copy(din, dout)
-	nn.linear_backward(&t.ff_proj, t.act.ff_gelu, dout, tmp1)
+	ff_gelu := t.act.ff_gelu
+	if t.recompute_gelu {
+		ff_gelu = array.zeros(Dev, Typ, {B, T, 4*C})
+		nn.gelu_forward(t.act.ff_out, ff_gelu)
+	}
+	nn.linear_backward(&t.ff_proj, ff_gelu, dout, tmp1)
+	if t.recompute_gelu {
+		array.delete(ff_gelu)
+	}
 	nn.gelu_backward(t.act.ff_out, tmp1, tmp1)
 	tmp2 := dout
 	nn.linear_backward(&t.ff, t.act.norm2, tmp1, tmp2)
@@ -337,7 +359,9 @@ build_transformer :: proc(t: ^Transformer($Dev, $Typ), B, T: int) {
 	t.act.res = array.zeros(Dev, Typ, {B, T, C})
 	t.act.norm2 = array.zeros(Dev, Typ, {B, T, C})
 	t.act.ff_out = array.zeros(Dev, Typ, {B, T, 4*C})
-	t.act.ff_gelu = array.zeros(Dev, Typ, {B, T, 4*C})
+	if !t.recompute_gelu {
+		t.act.ff_gelu = array.zeros(Dev, Typ, {B, T, 4*C})
+	}
 }
 
 delete_transformer_activations :: proc(a: ^Transformer_Activations($D, $T)) {
