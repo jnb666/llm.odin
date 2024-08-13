@@ -1,6 +1,5 @@
 package main
 
-import "core:flags"
 import "core:log"
 import "core:fmt"
 import "core:time"
@@ -44,7 +43,7 @@ generate_main :: proc(args: []string) {
 		topp        = 0.9,
 		cuda        = true,
 	}
-	flags.parse_or_exit(&opt, args, .Unix)
+	parse_args(&opt, "llm generate", args)
 	run(generate_run, &opt)
 }
 

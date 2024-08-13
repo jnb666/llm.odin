@@ -1,6 +1,5 @@
 package main
 
-import "core:flags"
 import "core:log"
 import "core:os"
 import "core:strings"
@@ -31,7 +30,7 @@ Dataset_Config :: struct {
 // run session to encode and save tokens to dataset file
 prepare_main :: proc(args: []string) {
 	opt := Prepare_Options{ config = "datasets.json" }
-	flags.parse_or_exit(&opt, args, .Unix)
+	parse_args(&opt, "llm prepare", args)
 	run(prepare_run, &opt)
 }
 

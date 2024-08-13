@@ -9,6 +9,7 @@ import "core:strings"
 import "core:time"
 import "core:path/filepath"
 import "core:encoding/json"
+import "core:flags"
 
 import "array"
 import "nn"
@@ -19,6 +20,7 @@ CPU :: array.CPU
 Cuda :: array.Cuda
 
 stdout := os.stream_from_handle(os.stdout)
+stderr := os.stream_from_handle(os.stderr)
 
 Base_Options :: struct {
 	debug: bool,
@@ -47,10 +49,9 @@ main :: proc() {
 		help_main({})
 		return
 	}
-	args := munge_args()
 	for cmd in commands {
 		if len(os.args) >= 2 && os.args[1] == cmd.name {
-			cmd.func(args)
+			cmd.func(os.args[2:])
 			return
 		}
 	}	
@@ -96,12 +97,19 @@ help_main :: proc(args: []string) {
 	}
 }
 
-// args => args[0]+args[1], args[2]...
-munge_args :: proc() -> []string {
-	args := make([]string, len(os.args)-1)
-	args[0] = strings.join({os.args[0], os.args[1]}, " ")
-	copy(args[1:], os.args[2:])
-	return args
+parse_args :: proc(model: ^$T, program: string, args: []string) {
+	err := flags.parse(model, args, .Unix)
+	if err == nil {
+		return
+	}
+	if _, ok := err.(flags.Help_Request); ok {
+		flags.write_usage(stderr, T, program, .Unix)
+		os.exit(0)
+	} else {
+		flags.print_errors(T, err, program, .Unix)
+		flags.write_usage(stderr, T, program, .Unix)
+		os.exit(1)
+	}
 }
 
 fatal_error :: proc(format: string, args: ..any) {

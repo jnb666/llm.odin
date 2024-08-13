@@ -1,6 +1,5 @@
 package main
 
-import "core:flags"
 import "core:fmt"
 import "core:log"
 import "core:os"
@@ -41,7 +40,7 @@ test_main :: proc(args: []string) {
 		loss_file   = "gpt2_124M_losses.json",
 		steps 		= 10,
 	}
-	flags.parse_or_exit(&opt, args, .Unix)
+	parse_args(&opt, "llm test", args)
 	run(test_run, &opt)
 }
 

@@ -1,6 +1,5 @@
 package main
 
-import "core:flags"
 import "core:fmt"
 import "core:log"
 import "core:os"
@@ -54,7 +53,7 @@ train_main :: proc(args: []string) {
 		top_p       = 0.9,
 		cuda        = true,
 	}
-	flags.parse_or_exit(&opt, args, .Unix)
+	parse_args(&opt, "llm train", args)
 	run(train_run, &opt)
 }
 
