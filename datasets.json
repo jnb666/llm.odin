@@ -1,0 +1,16 @@
+{
+	"tiny_shakespeare": {
+		"train_source": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt",
+		"train_file": "tiny_shakespeare.txt",
+		"val_tokens": 65536,
+		"record_separator": "\n\n"
+	},
+	"tiny_stories": {
+		"train_source": "https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt",
+		"val_source": "https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-valid.txt",
+		"train_file": "tiny_stories-train.txt",
+		"val_file": "tiny_stories-val.txt",
+		"record_separator": "<|endoftext|>",
+		"trim_space": true
+	}
+}

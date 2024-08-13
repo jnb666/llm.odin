@@ -7,9 +7,9 @@ import "core:time"
 import "core:strings"
 import "core:os"
 
-import "../gpt2"
-import "../nn"
-import "../util"
+import "gpt2"
+import "nn"
+import "util"
 
 
 Generate_Options :: struct {
@@ -24,6 +24,7 @@ Generate_Options :: struct {
 	temp: f32 `usage:"sampler temerature"`,
 	topk: int `usage:"top k sampler cutoff"`,
 	topp: f32 `usage:"top p sampler cutoff"`,
+	nonstop: bool `usage:"don't stop generating text when get the end token"`,
 }
 
 Context :: struct {
@@ -41,6 +42,7 @@ generate_main :: proc(args: []string) {
 		temp        = 1.0,
 		topk        = 10,
 		topp        = 0.9,
+		cuda        = true,
 	}
 	flags.parse_or_exit(&opt, args, .Unix)
 	run(generate_run, &opt)
@@ -57,11 +59,11 @@ generate_run :: proc(opt_ptr: rawptr) {
 }
 
 generate_start :: proc($Device, $Type: typeid, opt: ^Generate_Options) {
-	model_file := util.must_get_cache_file_path(opt.model)
+	model_file := data_file(opt.model, "snapshots")
 	defer delete(model_file)
 	model, err := gpt2.load_checkpoint(Device, Type, model_file)
 	if err != nil {
-		fatal_file_error("Error loading model", model_file, err)
+		fatal_error("Error loading %s: %v", model_file, err)
 	}
 	defer gpt2.delete_model(model)
 	if opt.verbose {
@@ -73,36 +75,52 @@ generate_start :: proc($Device, $Type: typeid, opt: ^Generate_Options) {
 
 	tokenizer := gpt2.new_tokenizer()
 	defer gpt2.delete_tokenizer(tokenizer)
-	stop_token := int(tokenizer.encoder[gpt2.End_Token])
-
-	prompt := strings.concatenate({gpt2.End_Token, opt.prompt})
-	defer delete(prompt)
-	tokens := gpt2.encode(tokenizer, prompt)
-	defer delete(tokens)
 
 	ctx := Context{opt=opt, tok=tokenizer}
 	start := time.now()
-	log.debugf("calling generate with prompt=%v max_length=%d stop_token=%d", prompt, opt.maxlen, stop_token)
+	prompt := get_prompt(opt.prompt, opt.debug)
+	defer delete(prompt)
+	tokens := gpt2.encode(tokenizer, prompt)
+	defer delete(tokens)
 	if opt.debug {
-		fmt.printf("%v => %s\n", tokens, prompt)
-	} else {
-		fmt.printf(opt.prompt)
+		fmt.printf("%v => %q\n", tokens, prompt)
 	}
-	gpt2.generate(model, sampler, &ctx, generate_callback, tokens, max_length=opt.maxlen, stop_token=stop_token)
+	stop := !opt.nonstop ? gpt2.End_Token_ID : -1
+	gpt2.generate(model, sampler, &ctx, generate_callback, tokens, max_length=opt.maxlen, stop_token=stop)
 
 	elapsed := time.duration_seconds(time.since(start))
 	fmt.println()
 	log.infof("Generated %d tokens in % .2fs - % .0fms/token", ctx.ntokens, elapsed, 1000*elapsed/f64(ctx.ntokens))
 }
 
+get_prompt :: proc(s: string, debug: bool) -> string {
+	txt, is_alloc := strings.replace_all(s, "\\n", "\n")
+	if !debug {
+		fmt.print(txt)
+	}
+	prompt := strings.concatenate({gpt2.End_Token, txt})
+	if is_alloc {
+		delete(txt)
+	}
+	return prompt
+}
+
 generate_callback :: proc(p: rawptr, token: u16, done: bool) {
 	ctx := cast(^Context)p
-	text := gpt2.decode(ctx.tok, token)
-	defer delete(text)
-	if ctx.debug {
-		fmt.printf("[%5d] => %q\n", token, text)
+	if token == gpt2.End_Token_ID {
+		if ctx.debug {
+			fmt.printf("[%5d] => %s\n", token, gpt2.End_Token)
+		} else if !done {
+			fmt.print("\n\n")
+		}
 	} else {
-		fmt.print(text)
+		text := gpt2.decode(ctx.tok, token)
+		defer delete(text)
+		if ctx.debug {
+			fmt.printf("[%5d] => %q\n", token, text)
+		} else {
+			fmt.print(text)
+		}
 	}
 	ctx.ntokens += 1
 }

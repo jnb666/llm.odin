@@ -300,7 +300,7 @@ attention_test_cuda :: proc(t: ^testing.T) {
 	defer array.delete(out_cuda)
 	log.debugf("Cuda output % 8.3f", out_cuda)
 
-	testing.expect(t, array.compare("out", out_cuda, out_cpu, epsilon=0.01))
+	testing.expect(t, array.compare("out", out_cuda, out_cpu, epsilon=0.01, quiet=true))
 }
 
 @(test)
@@ -316,7 +316,7 @@ attention_bwd_test_cuda :: proc(t: ^testing.T) {
 	defer array.delete(din_cuda)
 	log.debugf("Cuda din % 8.3f", din_cuda)
 
-	testing.expect(t, array.compare("din", din_cuda, din_cpu, epsilon=0.1, threshold=0.01))
+	testing.expect(t, array.compare("din", din_cuda, din_cpu, epsilon=0.1, threshold=0.01, quiet=true))
 }
 
 attention_test_on :: proc($Device, $Type: typeid, backward := false) -> Array(Device, Type) {
@@ -360,7 +360,7 @@ gelu_test_cuda :: proc(t: ^testing.T) {
 	defer array.delete(out_cuda)
 	log.debugf("Cuda output %.2g", out_cuda)
 
-	testing.expect(t, array.compare("out", out_cuda, out_cpu, epsilon=0.05))
+	testing.expect(t, array.compare("out", out_cuda, out_cpu, epsilon=0.05, quiet=true))
 }
 
 gelu_test_on :: proc($Device, $Type: typeid) -> Array(Device, Type) {
@@ -388,11 +388,11 @@ cross_entropy_test_cuda :: proc(t: ^testing.T) {
 
 	log.debug("CPU loss", loss_cpu)
 	log.debug("Cuda loss", loss_cuda)
-	testing.expect(t, array.compare("loss", loss_cuda, loss_cpu, epsilon=0.01))
+	testing.expect(t, array.compare("loss", loss_cuda, loss_cpu, epsilon=0.01, quiet=true))
 
 	log.debug("CPU dlogits", din_cpu)
 	log.debug("Cuda dlogits", din_cuda)
-	testing.expect(t, array.compare("dlogits", din_cuda, din_cpu, epsilon=0.01))
+	testing.expect(t, array.compare("dlogits", din_cuda, din_cpu, epsilon=0.01, quiet=true))
 }
 
 cross_entropy_test_on :: proc($Device, $Type: typeid) -> (Array(Device, f32), Array(Device, Type)) {
@@ -439,9 +439,9 @@ adamw_test :: proc(t: ^testing.T) {
 		log.debugf("step %d CPU norm=%.4g, Cuda norm=%.4g", step, cpu_norm, cuda_norm)
 		testing.expect(t, util.nearly_equal(cuda_norm, cpu_norm, epsilon, threshold))
 		for i in 0 ..< len(cpu_model.params) {
-			testing.expect(t, array.compare("m", cuda_opt.param_m[i], cpu_opt.param_m[i], epsilon, threshold))
-			testing.expect(t, array.compare("v", cuda_opt.param_v[i], cpu_opt.param_v[i], epsilon, threshold))
-			testing.expect(t, array.compare("weight", cuda_opt.weights[i], cpu_model.params[i].arr, epsilon, threshold))
+			testing.expect(t, array.compare("m", cuda_opt.param_m[i], cpu_opt.param_m[i], epsilon, threshold, quiet=true))
+			testing.expect(t, array.compare("v", cuda_opt.param_v[i], cpu_opt.param_v[i], epsilon, threshold, quiet=true))
+			testing.expect(t, array.compare("weight", cuda_opt.weights[i], cpu_model.params[i].arr, epsilon, threshold, quiet=true))
 		}
 	}
 }

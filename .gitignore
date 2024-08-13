@@ -6,3 +6,5 @@ cudnn/cudnn
 gpt2/gpt2
 llm/llm
 nn/nn
+llm
+data

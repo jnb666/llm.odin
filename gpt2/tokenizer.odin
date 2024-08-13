@@ -13,6 +13,8 @@ import "../util"
 
 End_Token ::  "<|endoftext|>"
 
+End_Token_ID :: 50256
+
 // Tokenizer to convert between text and integer tokens using GPT-2 byte pair encoding
 Tokenizer :: struct {
 	byte_enc: [256]rune,
@@ -110,26 +112,30 @@ delete_tokenizer :: proc(t: ^Tokenizer) {
 // Encode text string to list of tokens using byte pair encoding.
 encode :: proc(t: ^Tokenizer, text: string) -> []u16 {
 	tokens: [dynamic]u16
+	encode_to(t, text, &tokens)
+	return tokens[:]
+}
+
+encode_to :: proc(t: ^Tokenizer, text: string, tokens: ^[dynamic]u16) {
 	parts := strings.split(text, End_Token)
 	defer delete(parts)
 	matches: [dynamic]int
 	for part, i in parts {
 		if i > 0 {
-			append(&tokens, t.encoder[End_Token])
+			append(tokens, t.encoder[End_Token])
 		}
 		runes := utf8.string_to_runes(part)
 		split_words(runes, &matches)
 		start := 0
 		for end in matches {
 			word := utf8.runes_to_string(runes[start:end])
-			encode_word(t, word, &tokens)
+			encode_word(t, word, tokens)
 			delete(word)
 			start = end
 		}
 		delete(runes)
 	}
 	delete(matches)
-	return tokens[:]
 }
 
 // encode a single word to one or more tokens and append to tokens array
@@ -290,7 +296,7 @@ split_words :: proc(runes: []rune, matches: ^[dynamic]int) {
 main_loop:
 	for pos < len(runes) {
 		r := runes[pos]
-		if r == '\'' {
+		if r == '\'' && pos < len(runes)-1 {
 			if n := match_quote_suffix(runes[pos+1:]); n > 0 {
 				pos += n + 1
 				append(matches, pos)

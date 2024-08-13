@@ -35,7 +35,7 @@ matmul_test :: proc(t: ^testing.T) {
 	log.debug("trans(A) x B = ", c)
 	expect := array.new(CPU, f32, {3, 3}, []f32{11, -9, 5, -9, 21, -1, 5, -1, 3})
 	defer array.delete(expect)
-	testing.expect(t, array.compare("matmul", c, expect))
+	testing.expect(t, array.compare("matmul", c, expect, quiet=true))
 }
 
 @(test)
@@ -58,7 +58,7 @@ matmul_bias_test :: proc(t: ^testing.T) {
 	log.debug("trans(A) x B + bias = ", c)
 	expect := array.new(CPU, f32, {3, 3}, []f32{10.1, -9.8, 4.3, -9.9, 20.2, -1.7, 4.1, -1.8, 2.3})
 	defer array.delete(expect)
-	testing.expect(t, array.compare("matmul + bias", c, expect))
+	testing.expect(t, array.compare("matmul + bias", c, expect, quiet=true))
 }
 
 @(test)
@@ -81,7 +81,7 @@ matmul_dbias_test :: proc(t: ^testing.T) {
 	log.debug("sum(A) => ", dbias)
 	expect := array.new(CPU, f32, {3}, []f32{-2, 6, 0})
 	defer array.delete(expect)
-	testing.expect(t, array.compare("dbias", dbias, expect))
+	testing.expect(t, array.compare("dbias", dbias, expect, quiet=true))
 }
 
 

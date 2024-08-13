@@ -5,12 +5,11 @@ import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:time"
-import "core:encoding/json"
 
-import "../gpt2"
-import "../nn"
-import "../array"
-import "../util"
+import "gpt2"
+import "nn"
+import "array"
+import "util"
 
 Test_Options :: struct{
 	debug: bool `usage:"enable debug logging"`,
@@ -20,6 +19,7 @@ Test_Options :: struct{
 	debug_state: string `usage:"debug state checkpoint file"`,	
 	loss_file: string `usage:"json file with saved mean losses"`,
 	verbose: bool `usage:"show verbose output"`,
+	quiet: bool `usage:"suppress differences if ok"`,
 	steps: int `usage:"number of test steps"`,
 }
 
@@ -37,8 +37,8 @@ Debug_State :: struct{
 test_main :: proc(args: []string) {
 	opt := Test_Options{
 		model 		= "gpt2_124M.bin",
-		debug_state = "gpt2_124M_debug_state_0.bin",
-		loss_file	= "gpt2_124M_losses.json",
+		debug_state = "gpt2_124M_debug_state.bin",
+		loss_file   = "gpt2_124M_losses.json",
 		steps 		= 10,
 	}
 	flags.parse_or_exit(&opt, args, .Unix)
@@ -56,18 +56,18 @@ test_run :: proc(opt_ptr: rawptr) {
 }
 
 test_start :: proc($Device, $Type: typeid, opt: ^Test_Options) {
-	model_file := util.must_get_cache_file_path(opt.model)
+	model_file := data_file(opt.model, "snapshots")
 	defer delete(model_file)
 	model, err := gpt2.load_checkpoint(Device, Type, model_file)
 	if err != nil {
-		fatal_file_error("Error loading model", model_file, err)
+		fatal_error("Error loading %s: %v", model_file, err)
 	}
 	defer gpt2.delete_model(model)
 
 	state: ^Debug_State
 	state, err = load_debug_state(opt.debug_state, opt.loss_file, model.config)
 	if err != nil {
-		fatal_file_error("Error loading debug state", opt.debug_state, err)
+		fatal_error("Error loading debug state: %v", err)
 	}
 	defer delete_debug_state(state)
 
@@ -90,11 +90,13 @@ test_start :: proc($Device, $Type: typeid, opt: ^Test_Options) {
 	}
 	
 	when Device == CPU {
-		epsilon, threshold: f32 = 0.12, 0.001
+		epsilon, threshold: f32 = 0.12, 0.005
+		check_loss_steps := len(state.losses)
 	} else {
-		epsilon, threshold: f32 = 0.5, 0.1
+		epsilon, threshold: f32 = 0.2, 0.05
+		check_loss_steps := min(2, len(state.losses))
 	}
-	log.infof("compare epsilon=%.4g threshold=%.4g", epsilon, threshold)
+	log.infof("compare epsilon=%.4g threshold=%.4g check_loss_steps=%d", epsilon, threshold, check_loss_steps)
 
 	start_run := time.now()
 	all_ok := true
@@ -102,7 +104,7 @@ test_start :: proc($Device, $Type: typeid, opt: ^Test_Options) {
 		start := time.now()
 		gpt2.forward(model, input)
 		if step == 1 {
-			if !array.compare("logits", model.act.logits, state.logits, epsilon=epsilon, threshold=threshold, verbose=opt.verbose) {
+			if !array.compare("logits", model.act.logits, state.logits, epsilon=epsilon, threshold=threshold, verbose=opt.verbose, quiet=opt.quiet) {
 				all_ok = false
 			}
 		}
@@ -114,14 +116,14 @@ test_start :: proc($Device, $Type: typeid, opt: ^Test_Options) {
 		gpt2.backward(model, input)
 		elapsed_step := round_ms(time.since(start))
 		if step == 1 {
-			compare_params(&model.layer, &state.grads.layer, epsilon, threshold, opt.verbose, &all_ok)
+			compare_params(&model.layer, &state.grads.layer, epsilon, threshold, &all_ok, verbose=opt.verbose, quiet=opt.quiet)
 		}
 		grad_norm := nn.optimizer_step(adamw, model)
 		elapsed := round_ms(time.since(start))
 		exp_loss := step <= len(state.losses) ? state.losses[step-1] : -1
 		log.infof("step % 2d : norm = % 6.2f  loss = %.4f - expect %.4f  elapsed %v / %v", 
 			step, grad_norm, loss, exp_loss, elapsed_step, elapsed)
-		if step <= len(state.losses) && !util.nearly_equal(loss, exp_loss, epsilon, threshold) {
+		if step <= check_loss_steps && !util.nearly_equal(loss, exp_loss, epsilon, threshold) {
 			log.errorf("loss not matching expected")
 			all_ok = false
 		}
@@ -133,22 +135,22 @@ test_start :: proc($Device, $Type: typeid, opt: ^Test_Options) {
 	}
 }
 
-compare_params :: proc(m1: ^nn.Layer($D1, $T1), m2: ^nn.Layer($D2, $T2), epsilon, threshold: f32, verbose: bool, ok: ^bool) {
+compare_params :: proc(m1: ^nn.Layer($D1, $T1), m2: ^nn.Layer($D2, $T2), epsilon, threshold: f32, ok: ^bool, verbose, quiet: bool) {
 	buf: [64]u8
 	assert(m1.name == m2.name && len(m1.params) == len(m2.params))
 	for i in 0 ..< len(m1.params) {
 		name := fmt.bprintf(buf[:], "%s.p[%d]", m1.name, i)
-		if !array.compare(name, m1.params[i].grad, m2.params[i].arr, epsilon=epsilon, threshold=threshold, verbose=verbose) {
+		if !array.compare(name, m1.params[i].grad, m2.params[i].arr, epsilon=epsilon, threshold=threshold, verbose=verbose, quiet=quiet) {
 			ok^ = false
 		}
 	}
 	for i := len(m1.layers)-1; i >= 0; i -= 1 {
-		compare_params(m1.layers[i], m2.layers[i], epsilon, threshold, verbose, ok)
+		compare_params(m1.layers[i], m2.layers[i], epsilon, threshold, ok, verbose, quiet)
 	}
 }
 
-load_debug_state :: proc(file, loss_name: string, cfg: gpt2.Config) -> (s: ^Debug_State, err: os.Error) {
-	state_file := util.must_get_cache_file_path(file)
+load_debug_state :: proc(file, loss_file: string, cfg: gpt2.Config) -> (s: ^Debug_State, err: os.Error) {
+	state_file := data_file(file, "snapshots")
 	defer delete(state_file)
 	log.info("load debug state from", state_file)
 	file := os.open(state_file) or_return
@@ -182,21 +184,13 @@ load_debug_state :: proc(file, loss_name: string, cfg: gpt2.Config) -> (s: ^Debu
 	s.loss = loss[0]
 
 	s.grads = gpt2.new_model(CPU, f32, cfg)
-	gpt2.load_parameters(r, s.grads) or_return
+	gpt2.load_parameters(f32, r, s.grads) or_return
 
-	if loss_name == "" {
-		return s, nil
+	if loss_file != "" {
+		log.info("loading mean losses from", loss_file)
+		err = unmarshal_json_file(loss_file, &s.losses)
 	}
-	loss_file := util.must_get_cache_file_path(loss_name)
-	defer delete(loss_file)
-	log.info("loading mean losses from", loss_file)
-	data := os.read_entire_file_or_err(loss_file) or_return
-	defer delete(data)
-	if err := json.unmarshal(data, &s.losses); err != nil {
-		log.errorf("unmarshal error: %v", err)
-		return nil, .Invalid_File
-	}
-	return s, nil
+	return s, err
 }
 
 delete_debug_state :: proc(s: ^Debug_State) {

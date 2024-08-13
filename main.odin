@@ -2,14 +2,16 @@ package main
 
 import "core:fmt"
 import "core:os"
+import "core:sys/linux"
 import "core:log"
 import "core:mem"
 import "core:strings"
 import "core:time"
+import "core:path/filepath"
+import "core:encoding/json"
 
-import "../array"
-import "../nn"
-import "../util"
+import "array"
+import "nn"
 
 Array :: array.Array
 BF16 :: array.BF16
@@ -31,6 +33,7 @@ Command :: struct{
 }
 
 commands := []Command {
+	{prepare_main, 	"prepare", 	"download sample datasets and encode tokens"},
 	{train_main, 	"train", 	"general training handler: train the model on a training data and evaluate the output"},
 	{generate_main, "generate", "generate text by sampling the model output logits"},
 	{test_main, 	"test", 	"run training session to compare model output with saved pytorch state"},
@@ -101,9 +104,18 @@ munge_args :: proc() -> []string {
 	return args
 }
 
-fatal_file_error :: proc(msg, file: string, err: os.Error) {
-	log.fatalf("%s %s: %s", msg, file, os.error_string(err))
+fatal_error :: proc(format: string, args: ..any) {
+	log.fatalf(format, ..args)
 	os.exit(1)
+}
+
+unmarshal_json_file :: proc(file_name: string, ptr: ^$T) -> os.Error {
+	data := os.read_entire_file_or_err(file_name) or_return
+	defer delete(data)
+	if err := json.unmarshal(data, ptr); err != nil {
+		log.panic(err)
+	}
+	return nil
 }
 
 round_ms :: proc(d: time.Duration) -> time.Duration {
@@ -112,4 +124,69 @@ round_ms :: proc(d: time.Duration) -> time.Duration {
 
 round_sec :: proc(d: time.Duration) -> time.Duration {
 	return time.duration_round(d, time.Second)
+}
+
+make_dir_if_not_exist :: proc(name: string) {
+	if os.is_dir(name) {
+		return
+	}
+	if os.exists(name) {
+		log.panicf("%s is not a directory!", name)
+	}
+	if err := os.make_directory(name, 0o755); err != os.ERROR_NONE {
+		log.panicf("error creating %s dir: %v", name, err)
+	}
+}
+
+// Get file path as data/<subdir>/<name> creating dirs if needed
+data_file :: proc(name, subdir: string) -> string {
+	make_dir_if_not_exist("data")
+	dir := filepath.join({"data", subdir})
+	defer delete(dir)
+	make_dir_if_not_exist(dir)
+	return filepath.join({dir, name})
+}
+
+// get file via http if not already cached
+download_file :: proc(file, url: string) -> string {
+	if !os.exists(file) {
+		log.infof("downloading %s from %s", file, url)
+		status, err := http_get(url, file)
+		if err != nil {
+			fatal_error("http_get: error launching curl process: %v", err)
+		}
+		if status != 0 {
+			fatal_error("http_get: curl error %d", status)
+		}
+	}
+	data, err := os.read_entire_file_or_err(file)
+	if err != nil {
+		fatal_error("error reading %s: %v", file, err)
+	}
+	return string(data)
+}
+
+// fork curl process to download a file - will only work on Linux
+// if no system error then returns the status code from the curl child process
+http_get :: proc(url, file: string) -> (status: u32, err: os.Error) {
+	pid := os.fork() or_return
+	if pid == 0 {
+		os.execvp("curl", {"-#", "-L", "-f", "-o", file, url}) or_return
+	} else {
+		got_pid, child_status := wait_pid(pid) or_return
+		if got_pid < 0 || got_pid != pid {
+			return 0, .Unsupported
+		}
+		status = child_status/256
+	}
+	return
+}
+
+wait_pid :: proc(pid: os.Pid) -> (os.Pid, u32, os.Error) {
+	rusage: linux.RUsage
+	opt: linux.Wait_Options
+	id := linux.Pid(pid)
+	status: u32
+	pid2, err := linux.wait4(id, &status, opt, &rusage)
+	return os.Pid(pid2), status, err
 }

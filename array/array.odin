@@ -42,6 +42,8 @@ copy :: proc{copy_array_cpu, copy_array_cuda,
 
 read :: proc{read_cpu, read_cuda}
 
+write :: proc{write_cpu, write_cuda}
+
 mean :: proc{mean_cpu, mean_cuda}
 
 ptr :: proc "contextless" (a: Array($D, $T), offset := 0) -> [^]T {
@@ -148,9 +150,23 @@ read_cpu :: proc($Data_Type: typeid, r: io.Stream, dst: Array(CPU, $T), loc := #
 	} else {
 		buf := make([]Data_Type, dst.size)
 		defer delete(buf)
-		util.read_slice(r, buf[:dst.size]) or_return
+		util.read_slice(r, buf) or_return
 		copy(dst, buf)
 		return nil
+	}
+}
+
+// Write data to stream
+write_cpu :: proc($Data_Type: typeid, w: io.Stream, src: Array(CPU, $T), loc := #caller_location) -> io.Error {
+	assert(src.size > 0, "zero size array", loc)
+	when Data_Type == T {
+		data := ptr(src)
+		return util.write_slice(w, data[:src.size])
+	} else {
+		buf := make([]Data_Type, src.size)
+		defer delete(buf)
+		copy(buf, src)
+		return util.write_slice(w, buf)
 	}
 }
 
@@ -235,7 +251,7 @@ convert_slice :: proc(dst: []$T, src: []$V) where intrinsics.type_is_numeric(T) 
 
 // Check if arrays a and b have all elements with matching within relative + absolute error threshold
 compare :: proc(name: string, arr_a: Array($D1, $T1), arr_b: Array($D2, $T2), epsilon: f32 = 1e-3, 
-				threshold: f32 = 1e-6, max_print := 10, verbose := false, loc := #caller_location) -> bool {
+				threshold: f32 = 1e-6, max_print := 10, verbose := false, quiet := false, loc := #caller_location) -> bool {
 	b1, b2: [32]u8
 
 	fmt_num :: proc(buf: []u8, x: f32) -> string {
@@ -274,7 +290,7 @@ compare :: proc(name: string, arr_a: Array($D1, $T1), arr_b: Array($D2, $T2), ep
 		log.errorf("%-20s: %d / %d values outside threshold  max_diff=%.2g", name, n_err, len(a), max_diff, location=loc)
 		return false
 	}
-	if !verbose {
+	if quiet {
 		log.debugf("%-20s: all ok  max_diff=%.2g", name, max_diff, location=loc)
 	} else {
 		log.infof("%-20s: all ok  max_diff=%.2g", name, max_diff, location=loc)

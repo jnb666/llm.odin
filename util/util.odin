@@ -43,29 +43,6 @@ user_cache_dir :: proc() -> (dir: string, ok: bool) {
 	return "", false
 }
 
-// prefix user_cache_dir() / subdir  to file if path is not absolute
-// always allocates a new string
-get_cache_file_path :: proc(file_name: string, subdir := "") -> (file: string, ok: bool) {
-	if filepath.is_abs(file_name) {
-		return strings.clone(file_name), true
-	}
-	cache_dir := user_cache_dir() or_return
-	defer delete(cache_dir)
-	if subdir == "" {
-		return filepath.join({cache_dir, Cache_Dir, file_name}), true
-	} else {
-		return filepath.join({cache_dir, Cache_Dir, subdir, file_name}), true	
-	}
-}
-
-must_get_cache_file_path :: proc(file_name: string, subdir := "", loc := #caller_location) -> string {
-	file, ok := get_cache_file_path(file_name, subdir)
-	if !ok {
-		panic("error getting cache directory", loc)
-	}
-	return file
-}
-
 // Create new sequence as 0..end or start..<end range.
 seq :: proc{seq_1, seq_2}
 
@@ -129,6 +106,13 @@ nearly_equal :: proc "contextless" (a, b: f32, epsilon: f32 = 1e-3, threshold: f
 read_slice :: proc(r: io.Stream, data: []$T) -> io.Error {
 	buf := slice.to_bytes(data)
 	_, err := io.read_full(r, buf)
+	return err
+}
+
+// write slice of data to output stream
+write_slice :: proc(w: io.Stream, data: []$T) -> io.Error {
+	buf := slice.to_bytes(data)
+	_, err := io.write_full(w, buf)
 	return err
 }
 

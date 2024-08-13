@@ -121,6 +121,15 @@ read_cuda :: proc($Data_Type: typeid, r: io.Stream, dst: Array(Cuda, $T), loc :=
 	return nil
 }
 
+// Write data to stream
+write_cuda :: proc($Data_Type: typeid, w: io.Stream, src: Array(Cuda, $T), loc := #caller_location) -> io.Error {
+	assert(src.size > 0, "zero size array", loc)
+	buf := make([]Data_Type, src.size)
+	defer delete(buf)
+	copy(buf, src)
+	return util.write_slice(w, buf)
+}
+
 // Get mean value of array elements - calculated on CPU so best for small arrays
 mean_cuda :: proc(a: Array(Cuda, $T)) -> f32 {
 	vals := make([]f32, a.size)
