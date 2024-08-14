@@ -11,6 +11,7 @@ import "core:path/filepath"
 import "core:encoding/json"
 import "core:flags"
 
+import "../back"
 import "array"
 import "nn"
 
@@ -43,6 +44,10 @@ commands := []Command {
 }
 
 main :: proc() {
+	when ODIN_DEBUG {
+		context.assertion_failure_proc = back.assertion_failure_proc
+		back.register_segfault_handler()
+	}
 	context.logger = log.create_console_logger(.Info, {.Level, .Terminal_Color, .Time})
 	defer log.destroy_console_logger(context.logger)
 	if len(os.args) < 2 {

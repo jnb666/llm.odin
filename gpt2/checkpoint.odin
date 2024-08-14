@@ -60,6 +60,7 @@ read_checkpoint_header :: proc(r: io.Stream) -> (cfg: Config, version: i32, err:
 
 write_checkpoint_header :: proc(w: io.Stream, cfg: Config, version: i32) -> io.Error {
 	header := make([]i32, nn.Header_Size)
+	defer delete(header)
 	header[0] = Checkpoint_Magic
 	header[1] = version
 	header[2] = i32(cfg.max_seq)

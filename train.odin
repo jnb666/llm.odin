@@ -11,30 +11,35 @@ import "nn"
 import "array"
 import "util"
 import "cuda"
+import "plot"
 
+Plot_Width :: 1000
+Plot_Height :: 1000
 
 Train_Options :: struct{
 	debug: bool `usage:"enable debug logging"`,
 	track: bool `usage:"use tracking allocator to find memory leaks"`,
-	cuda: bool `usage:"use Cuda acceleration"`,
-	model: string `usage:"model checkpoint file"`,
+	cuda: bool `usage:"use Cuda acceleration - default true"`,
+	model: string `usage:"model checkpoint file - default gpt2_124M.bin"`,
 	dataset: string `usage:"dataset file name"`,
 	verbose: bool `usage:"show verbose output"`,
-	steps: int `usage:"number of training steps"`,
-	val_steps: int `usage:"limit on number of validation batches"`,
-	val_every: int `usage:"check validation loss every n steps"`,
-	sample_every: int `usage:"sample output every n steps"`,
-	save_every: int `usage:"save checkpoint every n steps"`,
-	sample_len: int `usage:"length of sample text"`,
-	temperature: f32 `usage:"sampler temperature parameter"`,
-	top_p: f32 `usage:"sampler top_p parameter"`,
+	steps: int `usage:"number of training steps - default 50"`,
+	val_steps: int `usage:"limit on number of validation batches- default 20"`,
+	val_every: int `usage:"check validation loss every n steps - default 20"`,
+	sample_every: int `usage:"sample output every n steps - default 100"`,
+	save_every: int `usage:"save checkpoint every n steps - default 100"`,
+	sample_len: int `usage:"length of sample text - default 256"`,
+	temperature: f32 `usage:"sampler temperature parameter - default 1.0"`,
+	top_p: f32 `usage:"sampler top_p parameter - default 0.9"`,
 	top_k: int `usage:"sampler top_k parameter"`,
-	batch: int `usage:"number of samples in each training batch"`,
-	seq_len: int `usage:"sequence length of each training sample"`,
-	learn_rate: f32 `usage:"AdamW learning rate parameter"`,
+	batch: int `usage:"number of samples in each training batch - default 4"`,
+	seq_len: int `usage:"sequence length of each training sample - default 1024"`,
+	learn_rate: f32 `usage:"AdamW learning rate parameter - default 3e-4"`,
 	weight_decay: f32 `usage:"AdamW weight decay parameter"`,
 	grad_clip: f32 `usage:"AdamW gradient clip parameter"`,
-	recompute: bool `usage:"recompute Gelu activations to save memory"`
+	recompute: bool `usage:"recompute Gelu activations to save memory - default true"`,
+	nonstop: bool `usage:"don't stop generating text when get the end token"`,
+	plot: bool `usage:"plot loss values to a webview window"`,
 }
 
 // run test training session to compare model outputs with saved pytorch reference
@@ -53,6 +58,7 @@ train_main :: proc(args: []string) {
 		temperature = 1.0,
 		top_p       = 0.9,
 		cuda        = true,
+		recompute   = true,
 	}
 	parse_args(&opt, "llm train", args)
 	run(train_run, &opt)
@@ -91,10 +97,6 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 	defer gpt2.delete_tokenizer(tokenizer)
 
 	// load training and validation data
-	if opt.dataset == "" {
-		log.fatal("dataset parameter is required")
-		os.exit(1)
-	}
 	train_data := load_dataset(Device, opt, train=true)
 	defer nn.delete_dataset(train_data)
 
@@ -106,13 +108,16 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 	log.infof("%.4v", adamw.config)
 	defer nn.delete_optimizer(adamw)
 
+	// GUI - plotting
+	stats: plot.Stats
+	view := opt.plot ? plot.start(Plot_Width, Plot_Height, xrange={opt.steps+1}) : nil
+
 	// main training loop
 	start_run := time.now()
 	start_check := time.now()
 	mean_norm, mean_loss: util.Running_Mean
 	checkpoint_file := checkpoint_filename(opt.model, opt.dataset)
 	defer delete(checkpoint_file)
-	buf: [64]u8
 
 	for step in 1 ..= opt.steps {
 		start_step := time.now()
@@ -120,19 +125,22 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 		util.add_mean(&mean_loss, loss)
 		util.add_mean(&mean_norm, norm)
 
-		fmt.printf("\rstep % 3d/% 3d: norm % 6.2f  train loss % 6.3f  ", step, opt.steps, mean_norm.value, mean_loss.value)
-		gpu_mem := max_device_memory_used(Device, buf[:])
 		if step == opt.steps || step % opt.val_every == 0 {
 			val_loss := calc_validation_loss(model, test_data, opt.val_steps)
 			elapsed := time.since(start_check) / time.Duration(opt.val_every)
-			fmt.printf("val loss % 6.3f  %s  %v  \n", val_loss, gpu_mem, round_ms(elapsed))
+			log_stats(Device, opt, &stats, step, elapsed, loss, mean_norm.value, mean_loss.value, val_loss)
 			mean_norm, mean_loss = {}, {}
-			start_check = time.now() 
+			start_check = time.now()
 		} else {
-			fmt.printf("%17s%s  %v  ", "", gpu_mem, round_ms(time.since(start_step)))
+			log_stats(Device, opt, &stats, step, time.since(start_step), loss, mean_norm.value, mean_loss.value)
 		}
 		if step == opt.steps || step % opt.sample_every == 0 {
-			sample_text(model, tokenizer, opt)
+			sample_text(model, tokenizer, opt, step, &stats)
+		}
+		if opt.plot {
+			if err := plot.draw(view, &stats); err != nil {
+				log.error("Error updating plot:", err)
+			}
 		}
 		if step == opt.steps || step % opt.save_every == 0 {
 			if err := gpt2.save_checkpoint(model, checkpoint_file); err != nil {
@@ -143,25 +151,52 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 
 	run_elapsed := round_sec(time.since(start_run))
 	log.infof("total elapsed time = %v", run_elapsed)
+	if opt.plot {
+		plot.wait(view)
+	}
 }
 
-sample_text :: proc(model: ^gpt2.Model($D, $T), tokenizer: ^gpt2.Tokenizer, opt: ^Train_Options) {
-	log.debug("sample text")
-	fmt.println()
-	tokenizer := tokenizer
+log_stats :: proc($Device: typeid, opt: ^Train_Options, s: ^plot.Stats, step: int, elapsed: time.Duration, batch_loss, norm, loss: f32, val_loss: f32 = -1) {
+	fmt.printf("\rstep % 3d/% 3d: norm % 6.2f  train loss % 6.3f  ", step, opt.steps, norm, loss)
+	buf: [64]u8
+	gpu_mem := max_device_memory_used(Device, buf[:])
+	plot.add(s, "training loss", step, batch_loss, width=1, opacity=0.5)
+	if val_loss >= 0 {
+		fmt.printf("val loss % 6.3f  %s  %v  \n", val_loss, gpu_mem, round_ms(elapsed))
+		plot.add(s, "avg training loss", step, loss)
+		plot.add(s, "avg validation loss", step, val_loss)
+	} else {
+		fmt.printf("%17s%s  %v  ", "", gpu_mem, round_ms(elapsed))
+	}
+}
+
+Sample_Context :: struct {
+	tok: ^gpt2.Tokenizer,
+	buf: strings.Builder,
+}
+
+sample_text :: proc(model: ^gpt2.Model($D, $T), tokenizer: ^gpt2.Tokenizer, opt: ^Train_Options, step: int, s: ^plot.Stats) {
+	log.debugf("sample text: step=%d", step)
 	sampler := nn.Sampler{ temperature=opt.temperature, top_k=opt.top_k, top_p=opt.top_p }
 	prompt := [1]u16{gpt2.End_Token_ID}
-	gpt2.generate(model, sampler, tokenizer, sample_callback, prompt[:], max_length=opt.sample_len)
-	fmt.println("\n")
+	stop := !opt.nonstop ? gpt2.End_Token_ID : -1
+	ctx := Sample_Context{tok = tokenizer}
+	gpt2.generate(model, sampler, &ctx, sample_callback, prompt[:], max_length=opt.sample_len, stop_token=stop)
+	text := strings.to_string(ctx.buf)
+	plot.add_sample(s, step, strings.trim_space(text))
+	if !opt.plot {
+		fmt.print("\n", text, "\n\n", sep="")
+	}
+	strings.builder_destroy(&ctx.buf)
 }
 
 sample_callback :: proc(p: rawptr, token: u16, done: bool) {
-	tok := cast(^gpt2.Tokenizer)p
+	ctx := cast(^Sample_Context)p
 	if token == gpt2.End_Token_ID {
-		fmt.printf("\n\n")
+		fmt.sbprint(&ctx.buf, "\n\n")
 	} else {
-		text := gpt2.decode(tok, token)
-		fmt.print(text)
+		text := gpt2.decode(ctx.tok, token)
+		fmt.sbprint(&ctx.buf, text)
 		delete(text)
 	}
 }

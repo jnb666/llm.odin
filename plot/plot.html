@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<script src="https://cdn.plot.ly/plotly-2.34.0.min.js" charset="utf-8"></script>
+<style>
+body {{
+    background-color: #222;
+}}
+#plotDiv {{
+    width: %[0]dpx;
+    height: %[1]dpx;
+}}
+#tableDiv {{
+    overflow: auto;
+    height: %[3]dpx;
+}}
+#tableDiv thead th {{
+    position: sticky;
+    top: 0;
+    z-index: -1;
+}}
+.center {{
+    margin-left: auto;
+    margin-right: auto;
+}}
+.left-col {{
+    width: 50px;
+}}
+table {{
+    width: %[0]dpx;
+    font-size: 0.875em;
+    font-family: Arial, Helvetica, sans-serif;
+    border-spacing: 0;
+    border-collapse: collapse;
+}}
+thead {{
+    height: %[2]dpx;
+}}
+tr {{
+    border: 2px solid #222;
+}}
+th {{
+    padding: 2px 4px;
+    background-color: #555;
+    color: white;
+}}
+td {{
+    padding: 2px 4px;
+    vertical-align: top;
+    text-align: center;
+    background-color: #111;
+    color: white;
+    cursor: default;
+}}
+td.sample {{
+    text-align: left;
+    white-space: pre-wrap;
+}}
+td.sample:hover {{
+    background: #333;
+}}
+</style>
+<body>
+<div id="plotDiv">
+</div>
+<div id="tableDiv">
+<table class="center">
+    <thead>
+        <tr><th class="left-col">step</th><th>sample</th></tr>
+    </thead>
+    <tbody id="tableContent">
+    </tbody>
+</table>
+</div>
+<script>
+    var layout = {{
+        paper_bgcolor: '#222',
+        plot_bgcolor : '#111',
+        colorway     : ['#ff7f0e', '#d62728', '#2ca02c', '#9467bd', '#1f77b4', '#bcbd22', '#8c564b', '#e377c2', '#7f7f7f', '#17becf'],
+        margin       : {{t: 40, b: 40, l: 40, r: 0}},
+        font         : {{color: '#f2f5fa'}},
+        xaxis        : {{gridcolor: '#283442', linecolor: '#506784', zerolinecolor: '#283442', range: [0, 1]}},
+        yaxis        : {{gridcolor: '#283442', linecolor: '#506784', zerolinecolor: '#283442', rangemode: 'tozero'}},
+        legend       : {{x: 1, xanchor: 'right', bgcolor: '#111'}},
+    }};
+    const plot = document.getElementById('plotDiv');
+    var samples = [];
+    var selected = -1;
+
+    Plotly.newPlot(plot, [], layout);
+
+    function setXRange(xmin, xmax) {{
+        layout.xaxis.range = [xmin, xmax];
+    }}
+
+    function updatePlot(data) {{
+        Plotly.react(plot, data, layout);
+    }}
+
+    function updateTable(data) {{
+        if (data.length > samples.length) {{
+            selected = data.length - 1;
+        }}
+        var html = "";
+        for (var i = data.length-1; i >= 0; i--) {{
+            const step = data[i].step;
+            const text = (i == selected) ? data[i].text : data[i].preview;
+            html += "<tr><td>"+step+"</td><td id='"+i+"' class='sample'>"+text+"</td></tr>";
+        }
+        document.getElementById("tableContent").innerHTML = html;
+        samples = data;
+    }
+
+    function expand(id) {{
+        document.getElementById(id).innerHTML = samples[id].text;
+    }}
+
+    function collapse(id) {{
+        document.getElementById(id).innerHTML = samples[id].preview;
+    }}
+
+    document.getElementById("tableContent").addEventListener("click", function (e) {{
+        const id = e.target.id;
+        if (typeof id === 'undefined' || id == '') return;
+        if (id == selected) {{
+            collapse(id);
+            selected = -1;
+        }} else {{
+            if (selected >= 0) collapse(selected);
+            expand(id);
+            selected = parseInt(id);
+        }}
+    }});
+
+    plotLoaded();
+</script>
+</body>
+</html>

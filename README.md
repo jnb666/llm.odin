@@ -14,6 +14,10 @@ Tested on Linux with Cuda 12.6 and cuDNN 9.3.0
 
 - Install Odin as per docs at https://odin-lang.org/docs/install to clone the git repo and build the compiler
 
+- For plotting install the [webview](https://github.com/webview/webview) shared library. `./script/build.sh && sudo cp build/library/libwebview.so /usr/local/lib`
+
+- For stack traces in debug mode install [back](https://github.com/laytan/back) under the project root dir
+
 - Under root dir for this project:
   - clone this repo  `git clone git clone https://github.com/jnb666/llm.odin.git llm`
   - run tests: `cd llm/gpt2; odin test . -all-packages`
@@ -46,6 +50,8 @@ and to generate text from the saved checkpoint:
 `./llm generate -model gpt2_124M_tiny_shakespeare.bin -nonstop -maxlen 512"`
 
 Run `./llm <command> --help` or see the source for all the command line options.
+
+For a GUI with a plot of the loss and a table of generated samples by epoch add the -plot option.
 
 ## License
 MIT

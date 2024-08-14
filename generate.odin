@@ -14,15 +14,15 @@ import "util"
 Generate_Options :: struct {
 	debug: bool `usage:"enable debug logging"`,
 	track: bool `usage:"use tracking allocator to find memory leaks"`,
-	cuda: bool `usage:"use Cuda acceleration"`,
-	model: string `usage:"model checkpoint file"`,
+	cuda: bool `usage:"use Cuda acceleration - default true"`,
+	model: string `usage:"model checkpoint file - default gpt2_124M.bin"`,
 	prompt: string `usage:"input prompt string"`,
 	verbose: bool `usage:"show verbose output"`,
-	maxlen: int `usage:"max number of tokens generated"`,
-	sampler: string `usage:"sampler type (greedy, random, top_k or top_p)"`,
-	temp: f32 `usage:"sampler temerature"`,
-	topk: int `usage:"top k sampler cutoff"`,
-	topp: f32 `usage:"top p sampler cutoff"`,
+	maxlen: int `usage:"max number of tokens generated- defalt 256"`,
+	sampler: string `usage:"sampler type (greedy, random, top_k or top_p) - default top_p"`,
+	temp: f32 `usage:"sampler temerature - default 1.0"`,
+	topk: int `usage:"top k sampler cutoff - default 10"`,
+	topp: f32 `usage:"top p sampler cutoff - default 0.9"`,
 	nonstop: bool `usage:"don't stop generating text when get the end token"`,
 }
 

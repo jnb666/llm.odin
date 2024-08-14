@@ -14,7 +14,7 @@ Prepare_Options :: struct {
 	track: bool `usage:"use tracking allocator to find memory leaks"`,
 	cuda: bool `usage:"use Cuda acceleration"`,
 	config: string `usage:"config json file with dataset definitions"`,
-	dataset: string `usage:"name of dataset to encode"`
+	dataset: string `args:"required" usage:"name of dataset to encode"`
 }
 
 Dataset_Config :: struct {
@@ -37,10 +37,6 @@ prepare_main :: proc(args: []string) {
 prepare_run :: proc(opt_ptr: rawptr) {
 	opt := cast(^Prepare_Options)opt_ptr
 	log.debugf("\n%v", opt)
-
-	if opt.dataset == "" {
-		fatal_error("dataset parameter is required")
-	}
 	config := make(map[string]Dataset_Config)
 	defer delete(config)
 	err := unmarshal_json_file(opt.config, &config)
