@@ -1,11 +1,11 @@
 package array
 
-import "core:testing"
-import "core:log"
-import "core:fmt"
-import "core:slice"
 import "../cuda"
 import "../util"
+import "core:fmt"
+import "core:log"
+import "core:slice"
+import "core:testing"
 
 @(test)
 basic_test :: proc(t: ^testing.T) {
@@ -29,10 +29,10 @@ basic_test_on :: proc(t: ^testing.T, $Device: typeid) {
 	arr: [6]f32
 	copy(arr[:], a)
 	log.debug(arr)
-	testing.expect(t, slice.equal(arr[:], []f32{0..<6 = 42}))
+	testing.expect(t, slice.equal(arr[:], []f32{0 ..< 6 = 42}))
 	zero(a)
 	copy(arr[:], a)
-	testing.expect(t, slice.equal(arr[:], []f32{0..<6 = 0}))	
+	testing.expect(t, slice.equal(arr[:], []f32{0 ..< 6 = 0}))
 }
 
 @(test)
@@ -59,9 +59,9 @@ bfloat16_test_on :: proc(t: ^testing.T, $Device: typeid) {
 
 @(test)
 view_test :: proc(t: ^testing.T) {
-	a := new(CPU, i32, {2, 20, 40}, util.seq(i32, 1600), move=true)
+	a := new(CPU, i32, {2, 20, 40}, util.seq(i32, 1600), move = true)
 	defer delete(a)
-	v := view(a, {5, 10}, offset=800)
+	v := view(a, {5, 10}, offset = 800)
 	log.debugf("\n% 6d", v)
 	v.dptr[index(v.shape, 4, 4)] = 42
 	testing.expect_value(t, a.dptr[index(a.shape, 1, 1, 4)], 42)
@@ -114,12 +114,15 @@ format_nil_test :: proc(t: ^testing.T) {
 
 @(test)
 format_test2 :: proc(t: ^testing.T) {
-	a := new(CPU, i32, {2, 20, 40}, util.seq(i32, 1600), move=true)
+	a := new(CPU, i32, {2, 20, 40}, util.seq(i32, 1600), move = true)
 	defer delete(a)
 	a_str := fmt.aprintf("% 6d", a)
 	defer delete(a_str)
 	log.debugf("\n%s", a_str)
-	testing.expect_value(t, a_str, `CPUArray<i32>[2 20 40]
+	testing.expect_value(
+		t,
+		a_str,
+		`CPUArray<i32>[2 20 40]
 [[[     0      1      2      3      4    ...     35     36     37     38     39]
   [    40     41     42     43     44    ...     75     76     77     78     79]
   [    80     81     82     83     84    ...    115    116    117    118    119]
@@ -143,7 +146,6 @@ format_test2 :: proc(t: ^testing.T) {
   [  1480   1481   1482   1483   1484    ...   1515   1516   1517   1518   1519]
   [  1520   1521   1522   1523   1524    ...   1555   1556   1557   1558   1559]
   [  1560   1561   1562   1563   1564    ...   1595   1596   1597   1598   1599]]]
-`)
+`,
+	)
 }
-
-

@@ -2,16 +2,16 @@ package nn
 
 import "base:runtime"
 import "core:fmt"
-import "core:math/rand"
-import "core:log"
 import "core:io"
+import "core:log"
+import "core:math/rand"
 import "core:text/table"
 
-import "../cuda"
 import "../array"
-import "../util"
-import "../cudnn"
 import "../cublas"
+import "../cuda"
+import "../cudnn"
+import "../util"
 
 cuda_ptx: string
 
@@ -35,7 +35,7 @@ compile_kernels :: proc() {
 
 // Initialize cuda context
 init_cuda :: proc(device := 0, verbose := false) -> ^cuda.UserContext {
-	ctx := cuda.create_context(device, ptx=cuda_ptx)
+	ctx := cuda.create_context(device, ptx = cuda_ptx)
 	cublas.register_handle(ctx)
 	cudnn.register_handle(ctx)
 	if verbose {
@@ -44,7 +44,7 @@ init_cuda :: proc(device := 0, verbose := false) -> ^cuda.UserContext {
 		device_name := cuda.device_name(dev)
 		defer delete(device_name)
 		total_mem := cuda.device_total_mem(dev)
-		log.infof("Cuda %d.%d %s %.0f MB", major, minor, device_name, f64(total_mem) / (1024*1024))
+		log.infof("Cuda %d.%d %s %.0f MB", major, minor, device_name, f64(total_mem) / (1024 * 1024))
 	}
 	return ctx
 }
@@ -82,11 +82,14 @@ to_float32 :: proc(inp: Array(Cuda, BF16), out: Array(Cuda, f32), loc := #caller
 	fn := cuda.get_function("bf16_to_f32")
 	BLOCK :: 512
 	xp, yp, size := array.ptr(inp), array.ptr(out), inp.size
-	cuda.launch_kernel(fn, gridX=util.ceil_div(size/2, BLOCK), blockX=BLOCK, params={&yp, &xp, &size})
+	cuda.launch_kernel(fn, gridX = util.ceil_div(size / 2, BLOCK), blockX = BLOCK, params = {&yp, &xp, &size})
 }
 
 // Calculate out = x + y
-add :: proc{add_cpu, add_cuda}
+add :: proc {
+	add_cpu,
+	add_cuda,
+}
 
 add_cpu :: proc(x, y, out: Array(CPU, f32), loc := #caller_location) #no_bounds_check {
 	assert(x.size == out.size && y.size == out.size, "size mismatch", loc)
@@ -104,11 +107,11 @@ add_cuda :: proc(x, y, out: Array(Cuda, $T), loc := #caller_location) where T ==
 	} else {
 		assert(x.size % 2 == 0, "size must be aligned to 2", loc)
 		fn := cuda.get_function("add_bf16")
-		grid := util.ceil_div(x.size/2, BLOCK)
+		grid := util.ceil_div(x.size / 2, BLOCK)
 	}
 	BLOCK :: 512
 	xp, yp, outp, size := array.ptr(x), array.ptr(y), array.ptr(out), y.size
-	cuda.launch_kernel(fn, gridX=grid, blockX=BLOCK, params={&outp, &xp, &yp, &size})
+	cuda.launch_kernel(fn, gridX = grid, blockX = BLOCK, params = {&outp, &xp, &yp, &size})
 }
 
 // Write a nicely formatted summary of the model. If expanded is set then shows all layers, else just the top level
@@ -121,8 +124,7 @@ write_summary :: proc(w: io.Writer, model: ^Layer($D, $T), expanded := false) {
 	format_row :: proc(t: ^table.Table, l: ^Layer($D, $T), indent := "") {
 		num := util.comma_format(l.num_params)
 		defer delete(num)
-		table.row(t, table.format(t, "%s%s (%s)", indent, l.info, l.type), 
-			table.format(t, "%v", l.out_shape), table.format(t, "%s", num))
+		table.row(t, table.format(t, "%s%s (%s)", indent, l.info, l.type), table.format(t, "%v", l.out_shape), table.format(t, "%s", num))
 		align_right(t, 2)
 	}
 
@@ -131,7 +133,7 @@ write_summary :: proc(w: io.Writer, model: ^Layer($D, $T), expanded := false) {
 
 	table.padding(t, 2, 2)
 	device, dtype: ^runtime.Type_Info
-	device, dtype = type_info_of(D), type_info_of(T)	
+	device, dtype = type_info_of(D), type_info_of(T)
 	table.caption(t, table.format(t, "== %s - device: %s, data type: %s ==", model.name, device, dtype))
 	table.header(t, "Layer", "Output shape", "Parameters")
 
@@ -150,6 +152,6 @@ write_summary :: proc(w: io.Writer, model: ^Layer($D, $T), expanded := false) {
 	table.row(t, "", "", num)
 	align_right(t, 2)
 
-	decorations := table.Decorations{"┌", "┬", "┐",	"├", "┼", "┤", "└", "┴", "┘", "│", "─"}
+	decorations := table.Decorations{"┌", "┬", "┐", "├", "┼", "┤", "└", "┴", "┘", "│", "─"}
 	table.write_decorated_table(w, t, decorations)
 }

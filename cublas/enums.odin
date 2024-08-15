@@ -1,151 +1,151 @@
 package cublas
 
 Status :: enum i32 {
-	SUCCESS = 0,
-	NOT_INITIALIZED = 1,
-	ALLOC_FAILED = 3,
-	INVALID_VALUE = 7,
-	ARCH_MISMATCH = 8,
-	MAPPING_ERROR = 11,
+	SUCCESS          = 0,
+	NOT_INITIALIZED  = 1,
+	ALLOC_FAILED     = 3,
+	INVALID_VALUE    = 7,
+	ARCH_MISMATCH    = 8,
+	MAPPING_ERROR    = 11,
 	EXECUTION_FAILED = 13,
-	INTERNAL_ERROR = 14,
-	NOT_SUPPORTED = 15,
-	LICENSE_ERROR = 16,
+	INTERNAL_ERROR   = 14,
+	NOT_SUPPORTED    = 15,
+	LICENSE_ERROR    = 16,
 }
 
 LibraryPropertyType :: enum i32 {
 	MAJOR_VERSION,
 	MINOR_VERSION,
-	PATCH_LEVEL
+	PATCH_LEVEL,
 }
 
 FillMode :: enum i32 {
 	FILL_MODE_LOWER = 0,
 	FILL_MODE_UPPER = 1,
-	FILL_MODE_FULL = 2,
+	FILL_MODE_FULL  = 2,
 }
 
 DiagType :: enum i32 {
 	DIAG_NON_UNIT = 0,
-	DIAG_UNIT = 1,
+	DIAG_UNIT     = 1,
 }
 
 SideMode :: enum i32 {
-	SIDE_LEFT = 0,
+	SIDE_LEFT  = 0,
 	SIDE_RIGHT = 1,
 }
 
 Operation :: enum i32 {
-	OP_N = 0,
-	OP_T = 1,
-	OP_C = 2,
+	OP_N        = 0,
+	OP_T        = 1,
+	OP_C        = 2,
 	OP_HERMITAN = 2,
-	OP_CONJG = 3,
+	OP_CONJG    = 3,
 }
 
 AtomicsMode :: enum i32 {
 	ATOMICS_NOT_ALLOWED = 0,
-	ATOMICS_ALLOWED = 1,
+	ATOMICS_ALLOWED     = 1,
 }
 
 GemmAlgo :: enum i32 {
-	DEFAULT = -1,
-	ALGO0 = 0,
-	ALGO1 = 1,
-	ALGO2 = 2,
-	ALGO3 = 3,
-	ALGO4 = 4,
-	ALGO5 = 5,
-	ALGO6 = 6,
-	ALGO7 = 7,
-	ALGO8 = 8,
-	ALGO9 = 9,
-	ALGO10 = 10,
-	ALGO11 = 11,
-	ALGO12 = 12,
-	ALGO13 = 13,
-	ALGO14 = 14,
-	ALGO15 = 15,
-	ALGO16 = 16,
-	ALGO17 = 17,
-	ALGO18 = 18,
-	ALGO19 = 19,
-	ALGO20 = 20,
-	ALGO21 = 21,
-	ALGO22 = 22,
-	ALGO23 = 23,
+	DEFAULT           = -1,
+	ALGO0             = 0,
+	ALGO1             = 1,
+	ALGO2             = 2,
+	ALGO3             = 3,
+	ALGO4             = 4,
+	ALGO5             = 5,
+	ALGO6             = 6,
+	ALGO7             = 7,
+	ALGO8             = 8,
+	ALGO9             = 9,
+	ALGO10            = 10,
+	ALGO11            = 11,
+	ALGO12            = 12,
+	ALGO13            = 13,
+	ALGO14            = 14,
+	ALGO15            = 15,
+	ALGO16            = 16,
+	ALGO17            = 17,
+	ALGO18            = 18,
+	ALGO19            = 19,
+	ALGO20            = 20,
+	ALGO21            = 21,
+	ALGO22            = 22,
+	ALGO23            = 23,
 	DEFAULT_TENSOR_OP = 99,
-	ALGO0_TENSOR_OP = 100,
-	ALGO1_TENSOR_OP = 101,
-	ALGO2_TENSOR_OP = 102,
-	ALGO3_TENSOR_OP = 103,
-	ALGO4_TENSOR_OP = 104,
-	ALGO5_TENSOR_OP = 105,
-	ALGO6_TENSOR_OP = 106,
-	ALGO7_TENSOR_OP = 107,
-	ALGO8_TENSOR_OP = 108,
-	ALGO9_TENSOR_OP = 109,
-	ALGO10_TENSOR_OP = 110,
-	ALGO11_TENSOR_OP = 111,
-	ALGO12_TENSOR_OP = 112,
-	ALGO13_TENSOR_OP = 113,
-	ALGO14_TENSOR_OP = 114,
-	ALGO15_TENSOR_OP = 115,
+	ALGO0_TENSOR_OP   = 100,
+	ALGO1_TENSOR_OP   = 101,
+	ALGO2_TENSOR_OP   = 102,
+	ALGO3_TENSOR_OP   = 103,
+	ALGO4_TENSOR_OP   = 104,
+	ALGO5_TENSOR_OP   = 105,
+	ALGO6_TENSOR_OP   = 106,
+	ALGO7_TENSOR_OP   = 107,
+	ALGO8_TENSOR_OP   = 108,
+	ALGO9_TENSOR_OP   = 109,
+	ALGO10_TENSOR_OP  = 110,
+	ALGO11_TENSOR_OP  = 111,
+	ALGO12_TENSOR_OP  = 112,
+	ALGO13_TENSOR_OP  = 113,
+	ALGO14_TENSOR_OP  = 114,
+	ALGO15_TENSOR_OP  = 115,
 }
 
 Math :: enum i32 {
-	DEFAULT_MATH = 0,
-	TENSOR_OP_MATH = 1,
-	PEDANTIC_MATH = 2,
-	TF32_TENSOR_OP_MATH = 3,
+	DEFAULT_MATH                              = 0,
+	TENSOR_OP_MATH                            = 1,
+	PEDANTIC_MATH                             = 2,
+	TF32_TENSOR_OP_MATH                       = 3,
 	MATH_DISALLOW_REDUCED_PRECISION_REDUCTION = 16,
 }
 
 DataType :: enum i32 {
-	R_16F  =  2, /* real as a half */
-	C_16F  =  6, /* complex as a pair of half numbers */
-	R_16BF = 14, /* real as a nv_bfloat16 */
-	C_16BF = 15, /* complex as a pair of nv_bfloat16 numbers */
-	R_32F  =  0, /* real as a float */
-	C_32F  =  4, /* complex as a pair of float numbers */
-	R_64F  =  1, /* real as a double */
-	C_64F  =  5, /* complex as a pair of double numbers */
-	R_4I   = 16, /* real as a signed 4-bit int */
-	C_4I   = 17, /* complex as a pair of signed 4-bit int numbers */
-	R_4U   = 18, /* real as a unsigned 4-bit int */
-	C_4U   = 19, /* complex as a pair of unsigned 4-bit int numbers */
-	R_8I   =  3, /* real as a signed 8-bit int */
-	C_8I   =  7, /* complex as a pair of signed 8-bit int numbers */
-	R_8U   =  8, /* real as a unsigned 8-bit int */
-	C_8U   =  9, /* complex as a pair of unsigned 8-bit int numbers */
-	R_16I  = 20, /* real as a signed 16-bit int */
-	C_16I  = 21, /* complex as a pair of signed 16-bit int numbers */
-	R_16U  = 22, /* real as a unsigned 16-bit int */
-	C_16U  = 23, /* complex as a pair of unsigned 16-bit int numbers */
-	R_32I  = 10, /* real as a signed 32-bit int */
-	C_32I  = 11, /* complex as a pair of signed 32-bit int numbers */
-	R_32U  = 12, /* real as a unsigned 32-bit int */
-	C_32U  = 13, /* complex as a pair of unsigned 32-bit int numbers */
-	R_64I  = 24, /* real as a signed 64-bit int */
-	C_64I  = 25, /* complex as a pair of signed 64-bit int numbers */
-	R_64U  = 26, /* real as a unsigned 64-bit int */
-	C_64U  = 27, /* complex as a pair of unsigned 64-bit int numbers */
+	R_16F     = 2, /* real as a half */
+	C_16F     = 6, /* complex as a pair of half numbers */
+	R_16BF    = 14, /* real as a nv_bfloat16 */
+	C_16BF    = 15, /* complex as a pair of nv_bfloat16 numbers */
+	R_32F     = 0, /* real as a float */
+	C_32F     = 4, /* complex as a pair of float numbers */
+	R_64F     = 1, /* real as a double */
+	C_64F     = 5, /* complex as a pair of double numbers */
+	R_4I      = 16, /* real as a signed 4-bit int */
+	C_4I      = 17, /* complex as a pair of signed 4-bit int numbers */
+	R_4U      = 18, /* real as a unsigned 4-bit int */
+	C_4U      = 19, /* complex as a pair of unsigned 4-bit int numbers */
+	R_8I      = 3, /* real as a signed 8-bit int */
+	C_8I      = 7, /* complex as a pair of signed 8-bit int numbers */
+	R_8U      = 8, /* real as a unsigned 8-bit int */
+	C_8U      = 9, /* complex as a pair of unsigned 8-bit int numbers */
+	R_16I     = 20, /* real as a signed 16-bit int */
+	C_16I     = 21, /* complex as a pair of signed 16-bit int numbers */
+	R_16U     = 22, /* real as a unsigned 16-bit int */
+	C_16U     = 23, /* complex as a pair of unsigned 16-bit int numbers */
+	R_32I     = 10, /* real as a signed 32-bit int */
+	C_32I     = 11, /* complex as a pair of signed 32-bit int numbers */
+	R_32U     = 12, /* real as a unsigned 32-bit int */
+	C_32U     = 13, /* complex as a pair of unsigned 32-bit int numbers */
+	R_64I     = 24, /* real as a signed 64-bit int */
+	C_64I     = 25, /* complex as a pair of signed 64-bit int numbers */
+	R_64U     = 26, /* real as a unsigned 64-bit int */
+	C_64U     = 27, /* complex as a pair of unsigned 64-bit int numbers */
 	R_8F_E4M3 = 28, /* real as a nv_fp8_e4m3 */
 	R_8F_E5M2 = 29, /* real as a nv_fp8_e5m2 */
 }
 
 ComputeType :: enum i32 {
-	COMPUTE_16F = 64,
-	COMPUTE_16F_PEDANTIC = 65,
-	COMPUTE_32F = 68,
-	COMPUTE_32F_PEDANTIC = 69,
-	COMPUTE_32F_FAST_16F = 74,
+	COMPUTE_16F           = 64,
+	COMPUTE_16F_PEDANTIC  = 65,
+	COMPUTE_32F           = 68,
+	COMPUTE_32F_PEDANTIC  = 69,
+	COMPUTE_32F_FAST_16F  = 74,
 	COMPUTE_32F_FAST_16BF = 75,
 	COMPUTE_32F_FAST_TF32 = 77,
-	COMPUTE_64F = 70,
-	COMPUTE_64F_PEDANTIC = 71,
-	COMPUTE_32I = 72,
-	COMPUTE_32I_PEDANTIC = 73,
+	COMPUTE_64F           = 70,
+	COMPUTE_64F_PEDANTIC  = 71,
+	COMPUTE_32I           = 72,
+	COMPUTE_32I_PEDANTIC  = 73,
 }
 
 MatmulTile :: enum i32 {
@@ -292,69 +292,69 @@ MatmulInnerShape :: enum i32 {
 }
 
 PointerMode :: enum i32 {
-	POINTER_MODE_HOST = 0,
-	POINTER_MODE_DEVICE = 1,
-	POINTER_MODE_DEVICE_VECTOR = 2,
+	POINTER_MODE_HOST                          = 0,
+	POINTER_MODE_DEVICE                        = 1,
+	POINTER_MODE_DEVICE_VECTOR                 = 2,
 	POINTER_MODE_ALPHA_DEVICE_VECTOR_BETA_ZERO = 3,
 	POINTER_MODE_ALPHA_DEVICE_VECTOR_BETA_HOST = 4,
 }
 
 PointerModeMask :: enum i32 {
-	POINTER_MODE_MASK_HOST = 1,
-	POINTER_MODE_MASK_DEVICE = 2,
-	POINTER_MODE_MASK_DEVICE_VECTOR = 4,
+	POINTER_MODE_MASK_HOST                          = 1,
+	POINTER_MODE_MASK_DEVICE                        = 2,
+	POINTER_MODE_MASK_DEVICE_VECTOR                 = 4,
 	POINTER_MODE_MASK_ALPHA_DEVICE_VECTOR_BETA_ZERO = 8,
 	POINTER_MODE_MASK_ALPHA_DEVICE_VECTOR_BETA_HOST = 16,
 }
 
 Order :: enum i32 {
-	ORDER_COL = 0,
-	ORDER_ROW = 1,
-	ORDER_COL32 = 2,
-	ORDER_COL4_4R2_8C = 3,
+	ORDER_COL          = 0,
+	ORDER_ROW          = 1,
+	ORDER_COL32        = 2,
+	ORDER_COL4_4R2_8C  = 3,
 	ORDER_COL32_2R_4R4 = 4,
 }
 
 MatrixLayoutAttribute :: enum i32 {
-	MATRIX_LAYOUT_TYPE = 0,
-	MATRIX_LAYOUT_ORDER = 1,
-	MATRIX_LAYOUT_ROWS = 2,
-	MATRIX_LAYOUT_COLS = 3,
-	MATRIX_LAYOUT_LD = 4,
-	MATRIX_LAYOUT_BATCH_COUNT = 5,
+	MATRIX_LAYOUT_TYPE                 = 0,
+	MATRIX_LAYOUT_ORDER                = 1,
+	MATRIX_LAYOUT_ROWS                 = 2,
+	MATRIX_LAYOUT_COLS                 = 3,
+	MATRIX_LAYOUT_LD                   = 4,
+	MATRIX_LAYOUT_BATCH_COUNT          = 5,
 	MATRIX_LAYOUT_STRIDED_BATCH_OFFSET = 6,
-	MATRIX_LAYOUT_PLANE_OFFSET = 7,
+	MATRIX_LAYOUT_PLANE_OFFSET         = 7,
 }
 
 MatmulDescAttributes :: enum i32 {
-	COMPUTE_TYPE = 0,
-	SCALE_TYPE = 1,
-	POINTER_MODE = 2,
-	TRANSA = 3,
-	TRANSB = 4,
-	TRANSC = 5,
-	FILL_MODE = 6,
-	EPILOGUE = 7,
-	BIAS_POINTER = 8,
-	BIAS_BATCH_STRIDE = 10,
-	EPILOGUE_AUX_POINTER = 11,
-	EPILOGUE_AUX_LD = 12,
-	EPILOGUE_AUX_BATCH_STRIDE = 13,
-	ALPHA_VECTOR_BATCH_STRIDE = 14,
-	SM_COUNT_TARGET = 15,
-	A_SCALE_POINTER = 17,
-	B_SCALE_POINTER = 18,
-	C_SCALE_POINTER = 19,
-	D_SCALE_POINTER = 20,
-	AMAX_D_POINTER = 21,
-	EPILOGUE_AUX_DATA_TYPE = 22,
-	EPILOGUE_AUX_SCALE_POINTER = 23,
-	EPILOGUE_AUX_AMAX_POINTER = 24,
-	FAST_ACCUM = 25,
-	BIAS_DATA_TYPE = 26,
-	ATOMIC_SYNC_NUM_CHUNKS_D_ROWS = 27,
-	ATOMIC_SYNC_NUM_CHUNKS_D_COLS = 28,
-	ATOMIC_SYNC_IN_COUNTERS_POINTER = 29,
+	COMPUTE_TYPE                     = 0,
+	SCALE_TYPE                       = 1,
+	POINTER_MODE                     = 2,
+	TRANSA                           = 3,
+	TRANSB                           = 4,
+	TRANSC                           = 5,
+	FILL_MODE                        = 6,
+	EPILOGUE                         = 7,
+	BIAS_POINTER                     = 8,
+	BIAS_BATCH_STRIDE                = 10,
+	EPILOGUE_AUX_POINTER             = 11,
+	EPILOGUE_AUX_LD                  = 12,
+	EPILOGUE_AUX_BATCH_STRIDE        = 13,
+	ALPHA_VECTOR_BATCH_STRIDE        = 14,
+	SM_COUNT_TARGET                  = 15,
+	A_SCALE_POINTER                  = 17,
+	B_SCALE_POINTER                  = 18,
+	C_SCALE_POINTER                  = 19,
+	D_SCALE_POINTER                  = 20,
+	AMAX_D_POINTER                   = 21,
+	EPILOGUE_AUX_DATA_TYPE           = 22,
+	EPILOGUE_AUX_SCALE_POINTER       = 23,
+	EPILOGUE_AUX_AMAX_POINTER        = 24,
+	FAST_ACCUM                       = 25,
+	BIAS_DATA_TYPE                   = 26,
+	ATOMIC_SYNC_NUM_CHUNKS_D_ROWS    = 27,
+	ATOMIC_SYNC_NUM_CHUNKS_D_COLS    = 28,
+	ATOMIC_SYNC_IN_COUNTERS_POINTER  = 29,
 	ATOMIC_SYNC_OUT_COUNTERS_POINTER = 30,
 }
 
@@ -366,83 +366,83 @@ MatrixTransformDescAttributes :: enum i32 {
 }
 
 Epilogue :: enum i32 {
-	EPILOGUE_DEFAULT = 1,
-	EPILOGUE_RELU = 2,
-	EPILOGUE_RELU_AUX = (EPILOGUE_RELU | 128),
-	EPILOGUE_BIAS = 4,
-	EPILOGUE_RELU_BIAS = (EPILOGUE_RELU | EPILOGUE_BIAS),
+	EPILOGUE_DEFAULT       = 1,
+	EPILOGUE_RELU          = 2,
+	EPILOGUE_RELU_AUX      = (EPILOGUE_RELU | 128),
+	EPILOGUE_BIAS          = 4,
+	EPILOGUE_RELU_BIAS     = (EPILOGUE_RELU | EPILOGUE_BIAS),
 	EPILOGUE_RELU_AUX_BIAS = (EPILOGUE_RELU_AUX | EPILOGUE_BIAS),
-	EPILOGUE_DRELU = 8 | 128,
-	EPILOGUE_DRELU_BGRAD = EPILOGUE_DRELU | 16,
-	EPILOGUE_GELU = 32,
-	EPILOGUE_GELU_AUX = (EPILOGUE_GELU | 128),
-	EPILOGUE_GELU_BIAS = (EPILOGUE_GELU | EPILOGUE_BIAS),
+	EPILOGUE_DRELU         = 8 | 128,
+	EPILOGUE_DRELU_BGRAD   = EPILOGUE_DRELU | 16,
+	EPILOGUE_GELU          = 32,
+	EPILOGUE_GELU_AUX      = (EPILOGUE_GELU | 128),
+	EPILOGUE_GELU_BIAS     = (EPILOGUE_GELU | EPILOGUE_BIAS),
 	EPILOGUE_GELU_AUX_BIAS = (EPILOGUE_GELU_AUX | EPILOGUE_BIAS),
-	EPILOGUE_DGELU = 64 | 128,
-	EPILOGUE_DGELU_BGRAD = EPILOGUE_DGELU | 16,
-	EPILOGUE_BGRADA = 256,
-	EPILOGUE_BGRADB = 512,
+	EPILOGUE_DGELU         = 64 | 128,
+	EPILOGUE_DGELU_BGRAD   = EPILOGUE_DGELU | 16,
+	EPILOGUE_BGRADA        = 256,
+	EPILOGUE_BGRADB        = 512,
 }
 
 ReductionScheme :: enum i32 {
-	NONE = 0,
-	INPLACE = 1,
+	NONE         = 0,
+	INPLACE      = 1,
 	COMPUTE_TYPE = 2,
-	OUTPUT_TYPE = 4,
-	MASK = 7,
+	OUTPUT_TYPE  = 4,
+	MASK         = 7,
 }
 
 MatmulSearch :: enum i32 {
-	SEARCH_BEST_FIT = 0,
+	SEARCH_BEST_FIT           = 0,
 	SEARCH_LIMITED_BY_ALGO_ID = 1,
-	SEARCH_RESERVED_02 = 2,
-	SEARCH_RESERVED_03 = 3,
-	SEARCH_RESERVED_04 = 4,
-	SEARCH_RESERVED_05 = 5,
+	SEARCH_RESERVED_02        = 2,
+	SEARCH_RESERVED_03        = 3,
+	SEARCH_RESERVED_04        = 4,
+	SEARCH_RESERVED_05        = 5,
 }
 
 MatmulPreferenceAttributes :: enum i32 {
-	SEARCH_MODE = 0,
-	MAX_WORKSPACE_BYTES = 1,
+	SEARCH_MODE           = 0,
+	MAX_WORKSPACE_BYTES   = 1,
 	REDUCTION_SCHEME_MASK = 3,
 	MIN_ALIGNMENT_A_BYTES = 5,
 	MIN_ALIGNMENT_B_BYTES = 6,
 	MIN_ALIGNMENT_C_BYTES = 7,
 	MIN_ALIGNMENT_D_BYTES = 8,
-	MAX_WAVES_COUNT = 9,
-	IMPL_MASK = 12,
+	MAX_WAVES_COUNT       = 9,
+	IMPL_MASK             = 12,
 }
 
 MatmulAlgoCapAttributes :: enum i32 {
-	ALGO_CAP_SPLITK_SUPPORT = 0,
-	ALGO_CAP_REDUCTION_SCHEME_MASK = 1,
-	ALGO_CAP_CTA_SWIZZLING_SUPPORT = 2,
-	ALGO_CAP_STRIDED_BATCH_SUPPORT = 3,
+	ALGO_CAP_SPLITK_SUPPORT              = 0,
+	ALGO_CAP_REDUCTION_SCHEME_MASK       = 1,
+	ALGO_CAP_CTA_SWIZZLING_SUPPORT       = 2,
+	ALGO_CAP_STRIDED_BATCH_SUPPORT       = 3,
 	ALGO_CAP_OUT_OF_PLACE_RESULT_SUPPORT = 4,
-	ALGO_CAP_UPLO_SUPPORT = 5,
-	ALGO_CAP_TILE_IDS = 6,
-	ALGO_CAP_CUSTOM_OPTION_MAX = 7,
-	ALGO_CAP_CUSTOM_MEMORY_ORDER = 10,
-	ALGO_CAP_POINTER_MODE_MASK = 11,
-	ALGO_CAP_EPILOGUE_MASK = 12,
-	ALGO_CAP_STAGES_IDS = 13,
-	ALGO_CAP_LD_NEGATIVE = 14,
-	ALGO_CAP_NUMERICAL_IMPL_FLAGS = 15,
-	ALGO_CAP_MIN_ALIGNMENT_A_BYTES = 16,
-	ALGO_CAP_MIN_ALIGNMENT_B_BYTES = 17,
-	ALGO_CAP_MIN_ALIGNMENT_C_BYTES = 18,
-	ALGO_CAP_MIN_ALIGNMENT_D_BYTES = 19,
-	ALGO_CAP_ATOMIC_SYNC = 20,
+	ALGO_CAP_UPLO_SUPPORT                = 5,
+	ALGO_CAP_TILE_IDS                    = 6,
+	ALGO_CAP_CUSTOM_OPTION_MAX           = 7,
+	ALGO_CAP_CUSTOM_MEMORY_ORDER         = 10,
+	ALGO_CAP_POINTER_MODE_MASK           = 11,
+	ALGO_CAP_EPILOGUE_MASK               = 12,
+	ALGO_CAP_STAGES_IDS                  = 13,
+	ALGO_CAP_LD_NEGATIVE                 = 14,
+	ALGO_CAP_NUMERICAL_IMPL_FLAGS        = 15,
+	ALGO_CAP_MIN_ALIGNMENT_A_BYTES       = 16,
+	ALGO_CAP_MIN_ALIGNMENT_B_BYTES       = 17,
+	ALGO_CAP_MIN_ALIGNMENT_C_BYTES       = 18,
+	ALGO_CAP_MIN_ALIGNMENT_D_BYTES       = 19,
+	ALGO_CAP_ATOMIC_SYNC                 = 20,
 }
 
 MatmulAlgoConfigAttributes :: enum i32 {
-	ALGO_CONFIG_ID = 0,
-	ALGO_CONFIG_TILE_ID = 1,
-	ALGO_CONFIG_SPLITK_NUM = 2,
+	ALGO_CONFIG_ID               = 0,
+	ALGO_CONFIG_TILE_ID          = 1,
+	ALGO_CONFIG_SPLITK_NUM       = 2,
 	ALGO_CONFIG_REDUCTION_SCHEME = 3,
-	ALGO_CONFIG_CTA_SWIZZLING = 4,
-	ALGO_CONFIG_CUSTOM_OPTION = 5,
-	ALGO_CONFIG_STAGES_ID = 6,
-	ALGO_CONFIG_INNER_SHAPE_ID = 7,
+	ALGO_CONFIG_CTA_SWIZZLING    = 4,
+	ALGO_CONFIG_CUSTOM_OPTION    = 5,
+	ALGO_CONFIG_STAGES_ID        = 6,
+	ALGO_CONFIG_INNER_SHAPE_ID   = 7,
 	ALGO_CONFIG_CLUSTER_SHAPE_ID = 8,
 }

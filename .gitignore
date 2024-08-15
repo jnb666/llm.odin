@@ -8,3 +8,7 @@ llm/llm
 nn/nn
 llm
 data
+scripts
+llm.sublime-project
+llm.sublime-workspace
+ols.json

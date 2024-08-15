@@ -7,8 +7,8 @@ import "core:slice"
 // Sampler is used to sample the probability outputs to get the next token
 Sampler :: struct {
 	temperature: f32,
-	top_k: int,
-	top_p: f32,
+	top_k:       int,
+	top_p:       f32,
 }
 
 Sample_Index :: struct {
@@ -44,7 +44,7 @@ sample_greedy :: proc(logits: []f32) -> u16 {
 	max_i := 0
 	for p, i in logits[1:] {
 		if p > max_p {
-			max_i, max_p = i+1, p
+			max_i, max_p = i + 1, p
 		}
 	}
 	return u16(max_i)
@@ -70,7 +70,7 @@ sample_top_k :: proc(probs: []f32, top_k: int) -> u16 {
 	for p, i in probs {
 		index[i] = Sample_Index{p, u16(i)}
 	}
-	slice.sort_by(index, proc(i, j: Sample_Index) -> bool{ return j.p < i.p })
+	slice.sort_by(index, proc(i, j: Sample_Index) -> bool {return j.p < i.p})
 	total_p: f32
 	for ix in index[:top_k] {
 		total_p += ix.p
@@ -83,21 +83,21 @@ sample_top_k :: proc(probs: []f32, top_k: int) -> u16 {
 			return ix.i
 		}
 	}
-	return index[top_k-1].i
+	return index[top_k - 1].i
 }
 
 // Select tokens from the smallest subset of probabilities that sum to greater than p
 //  i.e. cutoff based on probabilty rather than number of tokens
 sample_top_p :: proc(probs: []f32, top_p: f32) -> u16 {
-	cutoff := (1 - top_p) / f32(len(probs)-1)
-	index:  [dynamic]Sample_Index
+	cutoff := (1 - top_p) / f32(len(probs) - 1)
+	index: [dynamic]Sample_Index
 	defer delete(index)
 	for p, i in probs {
 		if p >= cutoff {
 			append(&index, Sample_Index{p, u16(i)})
 		}
 	}
-	slice.sort_by(index[:], proc(i, j: Sample_Index) -> bool{ return j.p < i.p })
+	slice.sort_by(index[:], proc(i, j: Sample_Index) -> bool {return j.p < i.p})
 	total_p: f32
 	last_index := len(index) - 1
 	for ix, i in index {

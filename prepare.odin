@@ -1,35 +1,37 @@
 package main
 
+import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:strings"
-import "core:fmt"
 
 import "gpt2"
 import "nn"
 
 
 Prepare_Options :: struct {
-	debug: bool `usage:"enable debug logging"`,
-	track: bool `usage:"use tracking allocator to find memory leaks"`,
-	cuda: bool `usage:"use Cuda acceleration"`,
-	config: string `usage:"config json file with dataset definitions"`,
-	dataset: string `args:"required" usage:"name of dataset to encode"`
+	debug:   bool `usage:"enable debug logging"`,
+	track:   bool `usage:"use tracking allocator to find memory leaks"`,
+	cuda:    bool `usage:"use Cuda acceleration"`,
+	config:  string `usage:"config json file with dataset definitions"`,
+	dataset: string `args:"required" usage:"name of dataset to encode"`,
 }
 
 Dataset_Config :: struct {
-	train_source: string,
-	train_file: string,
-	val_source: string,
-	val_file: string,
-	val_tokens: int,
+	train_source:     string,
+	train_file:       string,
+	val_source:       string,
+	val_file:         string,
+	val_tokens:       int,
 	record_separator: string,
-	trim_space: bool,
+	trim_space:       bool,
 }
 
 // run session to encode and save tokens to dataset file
 prepare_main :: proc(args: []string) {
-	opt := Prepare_Options{ config = "datasets.json" }
+	opt := Prepare_Options {
+		config = "datasets.json",
+	}
 	parse_args(&opt, "llm prepare", args)
 	run(prepare_run, &opt)
 }
@@ -63,7 +65,7 @@ prepare_dataset :: proc(dataset_name: string, cfg: Dataset_Config) {
 	delete(train_data)
 
 	if cfg.val_file != "" {
-		write_tokens(dataset_name, train_tokens, train=true)
+		write_tokens(dataset_name, train_tokens, train = true)
 		delete(train_tokens)
 		val_file := data_file(cfg.val_file, "datasets")
 		val_data := download_file(val_file, cfg.val_source)
@@ -71,22 +73,22 @@ prepare_dataset :: proc(dataset_name: string, cfg: Dataset_Config) {
 		delete(val_file)
 		val_tokens := tokenize(tok, val_data, cfg)
 		delete(val_data)
-		write_tokens(dataset_name, val_tokens, train=false)
+		write_tokens(dataset_name, val_tokens, train = false)
 		delete(val_tokens)
 
 	} else if cfg.val_tokens > 0 {
-		write_tokens(dataset_name, train_tokens[:cfg.val_tokens], train=false)
-		write_tokens(dataset_name, train_tokens[cfg.val_tokens:], train=true)
+		write_tokens(dataset_name, train_tokens[:cfg.val_tokens], train = false)
+		write_tokens(dataset_name, train_tokens[cfg.val_tokens:], train = true)
 		delete(train_tokens)
 
 	} else {
-		write_tokens(dataset_name, train_tokens, train=true)
+		write_tokens(dataset_name, train_tokens, train = true)
 		delete(train_tokens)
 	}
 }
 
 write_tokens :: proc(dataset_name: string, tokens: []u16, train: bool) {
-	file_name := strings.concatenate({dataset_name, train ? "_train.bin" : "_val.bin" })
+	file_name := strings.concatenate({dataset_name, train ? "_train.bin" : "_val.bin"})
 	defer delete(file_name)
 	out_file := data_file(file_name, "datasets")
 	defer delete(out_file)
@@ -111,7 +113,7 @@ tokenize :: proc(t: ^gpt2.Tokenizer, text: string, cfg: Dataset_Config) -> []u16
 		gpt2.encode_to(t, r, &tokens)
 		append(&tokens, gpt2.End_Token_ID)
 		if n % 1000 == 0 {
-			fmt.printf("\rtokenize record %d - %.0f%% done", n, 100*f64(done)/f64(length))
+			fmt.printf("\rtokenize record %d - %.0f%% done", n, 100 * f64(done) / f64(length))
 		}
 		n += 1
 		done += len(record) + len(cfg.record_separator)
@@ -119,5 +121,3 @@ tokenize :: proc(t: ^gpt2.Tokenizer, text: string, cfg: Dataset_Config) -> []u16
 	fmt.println()
 	return tokens[:]
 }
-
-

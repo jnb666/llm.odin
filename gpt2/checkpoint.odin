@@ -1,8 +1,8 @@
 package gpt2
 
-import "core:os"
 import "core:io"
 import "core:log"
+import "core:os"
 
 import "../array"
 import "../nn"
@@ -31,7 +31,7 @@ load_checkpoint :: proc($Device, $Type: typeid, file_name: string) -> (model: ^M
 // Save a checkpoint with the weights from the given model.
 save_checkpoint :: proc(model: ^Model($Device, $Type), file_name: string) -> os.Error {
 	log.info("save checkpoint to", file_name)
-	file := os.open(file_name, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644) or_return
+	file := os.open(file_name, os.O_RDWR | os.O_CREATE | os.O_TRUNC, 0o644) or_return
 	defer os.close(file)
 	w := os.stream_from_handle(file)
 	type := Checkpoint_Version_BF16 when Type == BF16 else Checkpoint_Version_F32
@@ -46,14 +46,14 @@ read_checkpoint_header :: proc(r: io.Stream) -> (cfg: Config, version: i32, err:
 	if header[0] != Checkpoint_Magic || (header[1] != Checkpoint_Version_F32 && header[1] != Checkpoint_Version_BF16) {
 		return cfg, 0, .Invalid_File
 	}
-	cfg = Config{
-		max_seq 	= int(header[2]),
-		vocab_size 	= int(header[3]),
-		num_layers	= int(header[4]),
-		num_heads	= int(header[5]),
-		channels	= int(header[6]),
-		vocab_padded= int(header[7]),
-		no_bias		= header[8] != 0,
+	cfg = Config {
+		max_seq      = int(header[2]),
+		vocab_size   = int(header[3]),
+		num_layers   = int(header[4]),
+		num_heads    = int(header[5]),
+		channels     = int(header[6]),
+		vocab_padded = int(header[7]),
+		no_bias      = header[8] != 0,
 	}
 	return cfg, header[1], nil
 }
@@ -117,4 +117,3 @@ write_parameter :: proc($Data_Type: typeid, w: io.Stream, layer: ^nn.Layer($D, $
 	p := &layer.params[n]
 	return array.write(Data_Type, w, p.arr)
 }
-

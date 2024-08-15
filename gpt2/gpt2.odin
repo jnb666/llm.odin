@@ -1,14 +1,14 @@
 package gpt2
 
 import "core:fmt"
-import "core:mem"
 import "core:log"
-import "core:os"
 import "core:math"
+import "core:mem"
+import "core:os"
 import "core:strings"
 
-import "../nn"
 import "../array"
+import "../nn"
 import "../util"
 
 Array :: array.Array
@@ -18,13 +18,13 @@ Cuda :: array.Cuda
 
 // GPT2 configuration 
 Config :: struct {
-	num_layers: int,
-	num_heads: int,
-	channels: int,
-	max_seq: int,
-	vocab_size: int,
-	vocab_padded: int,
-	no_bias: bool,
+	num_layers:     int,
+	num_heads:      int,
+	channels:       int,
+	max_seq:        int,
+	vocab_size:     int,
+	vocab_padded:   int,
+	no_bias:        bool,
 	recompute_gelu: bool,
 }
 
@@ -36,20 +36,20 @@ pad_vocab :: proc(cfg: ^Config, align := 128) {
 // GPT2 model definition
 Model :: struct($D, $T: typeid) {
 	using config: Config,
-	using layer: nn.Layer(D, T),
-	embed: nn.Encoder(D, T),
-	blocks: []^Transformer(D, T),
-	norm3: nn.Layernorm(D, T),
-	rev_embed: nn.Linear(D, T),
-	act: Activations(D, T),
+	using layer:  nn.Layer(D, T),
+	embed:        nn.Encoder(D, T),
+	blocks:       []^Transformer(D, T),
+	norm3:        nn.Layernorm(D, T),
+	rev_embed:    nn.Linear(D, T),
+	act:          Activations(D, T),
 }
 
 Activations :: struct($D, $T: typeid) {
-	encoded: Array(D, T),
+	encoded:      Array(D, T),
 	feed_forward: []Array(D, T),
-	final_norm: Array(D, T),
-	logits: Array(D, T),
-	losses: Array(D, f32),
+	final_norm:   Array(D, T),
+	logits:       Array(D, T),
+	losses:       Array(D, f32),
 	have_dlogits: bool,
 }
 
@@ -65,13 +65,13 @@ new_model :: proc($D, $T: typeid, cfg: Config) -> ^Model(D, T) {
 	m.blocks = make([]^Transformer(D, T), cfg.num_layers)
 	for i in 0 ..< cfg.num_layers {
 		m.blocks[i] = make_transformer(D, T, &m.config, i)
-		m.layers[i+1] = &m.blocks[i].layer
+		m.layers[i + 1] = &m.blocks[i].layer
 	}
 	m.norm3 = nn.make_layernorm(D, T, "norm3", cfg.channels)
-	m.layers[cfg.num_layers+1] = &m.norm3.layer
-	m.rev_embed = nn.make_linear(D, T, "rev_embed", cfg.channels, cfg.vocab_padded, no_init=true)
+	m.layers[cfg.num_layers + 1] = &m.norm3.layer
+	m.rev_embed = nn.make_linear(D, T, "rev_embed", cfg.channels, cfg.vocab_padded, no_init = true)
 	m.rev_embed.weight = m.embed.wte
-	m.layers[cfg.num_layers+2] = &m.rev_embed.layer
+	m.layers[cfg.num_layers + 2] = &m.rev_embed.layer
 
 	for layer in m.layers {
 		m.num_params += layer.num_params
@@ -92,15 +92,15 @@ init_weights :: proc(m: ^Model($Dev, $Typ), weight_scale: f32 = 0.02) {
 				array.fill(l.params[0].arr, 1)
 				array.zero(l.params[1].arr)
 			case "Linear":
-				sigma := strings.has_suffix(l.name, "proj") ? weight_scale/proj_scale : weight_scale
-				nn.normal_init(l.params[0].arr, stddev=sigma)
+				sigma := strings.has_suffix(l.name, "proj") ? weight_scale / proj_scale : weight_scale
+				nn.normal_init(l.params[0].arr, stddev = sigma)
 				array.zero(l.params[1].arr)
 			case "Encoder":
 				// for wte - note that weights may be padded - only init the ones that are used
 				array.zero(l.params[0].arr)
 				view := array.view(l.params[0].arr, {vocab_size, l.params[0].dims[1]})
-				nn.normal_init(view, stddev=weight_scale)
-				nn.normal_init(l.params[1].arr, stddev=weight_scale)
+				nn.normal_init(view, stddev = weight_scale)
+				nn.normal_init(l.params[1].arr, stddev = weight_scale)
 			case:
 				log.panic("invalid layer type", l.type)
 			}
@@ -110,8 +110,8 @@ init_weights :: proc(m: ^Model($Dev, $Typ), weight_scale: f32 = 0.02) {
 		}
 	}
 
-	proj_scale := 1 / math.sqrt(1 / f32(2*m.num_layers))
-	log.debugf("initialise GPT2 weights: stddev=%.4g proj_stddev=%.4g", weight_scale, weight_scale/proj_scale)
+	proj_scale := 1 / math.sqrt(1 / f32(2 * m.num_layers))
+	log.debugf("initialise GPT2 weights: stddev=%.4g proj_stddev=%.4g", weight_scale, weight_scale / proj_scale)
 	for layer in m.layers {
 		init_layer(layer, weight_scale, proj_scale, m.vocab_size)
 	}
@@ -142,7 +142,7 @@ forward :: proc(m: ^Model($Dev, $Typ), inp: Array(Dev, i32), train := true, loc 
 // Calculate cross entropy loss from logits populated from forward step and target predictions. Returns mean loss over the batch.
 // If train flag is set then will overwrite the logit activations with the logit gradients as first backprop step.
 calc_loss :: proc(m: ^Model($Dev, $Typ), targets: Array(Dev, i32), train := true, grad_accum_steps := 1, loc := #caller_location) -> f32 {
-	nn.cross_entropy_loss(m.act.logits, targets, m.act.losses, m.vocab_size, train, grad_accum_steps, loc=loc)
+	nn.cross_entropy_loss(m.act.logits, targets, m.act.losses, m.vocab_size, train, grad_accum_steps, loc = loc)
 	m.act.have_dlogits = train
 	return array.mean(m.act.losses)
 }
@@ -160,9 +160,9 @@ backward :: proc(m: ^Model($Dev, $Typ), inp: Array(Dev, i32), loc := #caller_loc
 	m.act.logits = {}
 	tmp2 := m.act.final_norm
 	array.zero(tmp2)
-	nn.layernorm_backward(&m.norm3, m.act.feed_forward[m.num_layers-1], tmp1, tmp2)
-	for i := m.num_layers-1; i >= 0; i -= 1 {
-		input := i > 0 ? m.act.feed_forward[i-1] : m.act.encoded
+	nn.layernorm_backward(&m.norm3, m.act.feed_forward[m.num_layers - 1], tmp1, tmp2)
+	for i := m.num_layers - 1; i >= 0; i -= 1 {
+		input := i > 0 ? m.act.feed_forward[i - 1] : m.act.encoded
 		transformer_backward(m.blocks[i], input, tmp2, tmp1)
 		tmp1, tmp2 = tmp2, tmp1
 	}
@@ -172,8 +172,16 @@ backward :: proc(m: ^Model($Dev, $Typ), inp: Array(Dev, i32), loc := #caller_loc
 // Generate output tokens from the model using the given sampler and initial prompt tokens.
 // Will exit after either max_length tokens are generated or the stop_token is received.
 // Calls fn after generating each token
-generate :: proc(m: ^Model($Dev, $Typ), sampler: nn.Sampler, ctx: rawptr, fn: proc(ctx: rawptr, token: u16, done: bool), prompt: []u16, 
-										max_length := 256, stop_token := -1, loc := #caller_location) {
+generate :: proc(
+	m: ^Model($Dev, $Typ),
+	sampler: nn.Sampler,
+	ctx: rawptr,
+	fn: proc(ctx: rawptr, token: u16, done: bool),
+	prompt: []u16,
+	max_length := 256,
+	stop_token := -1,
+	loc := #caller_location,
+) {
 	assert(len(prompt) < m.max_seq, "prompt is too long", loc)
 	assert(max_length <= m.max_seq, "max length exceeds model sequence length", loc)
 
@@ -190,8 +198,8 @@ generate :: proc(m: ^Model($Dev, $Typ), sampler: nn.Sampler, ctx: rawptr, fn: pr
 	done := false
 	for !done {
 		array.copy(input, tokens)
-		forward(m, input, train=false)
-		output := array.view(m.act.logits, {m.vocab_size}, offset=(t-1)*m.vocab_padded)
+		forward(m, input, train = false)
+		output := array.view(m.act.logits, {m.vocab_size}, offset = (t - 1) * m.vocab_padded)
 		array.copy(logits, output)
 		token := nn.sample(sampler, logits)
 		tokens[t] = token
@@ -250,24 +258,24 @@ delete_model :: proc(m: ^Model($D, $T)) {
 // Transformer block with multi-head self attention.
 Transformer :: struct($D, $T: typeid) {
 	using config: ^Config,
-	using layer: nn.Layer(D, T),
-	norm1: nn.Layernorm(D, T),
-	pre_att: nn.Linear(D, T),
-	attn: nn.Attention(D, T),
-	att_proj: nn.Linear(D, T),
-	norm2: nn.Layernorm(D, T),
-	ff: nn.Linear(D, T),
-	ff_proj: nn.Linear(D, T),
-	act: Transformer_Activations(D, T),
+	using layer:  nn.Layer(D, T),
+	norm1:        nn.Layernorm(D, T),
+	pre_att:      nn.Linear(D, T),
+	attn:         nn.Attention(D, T),
+	att_proj:     nn.Linear(D, T),
+	norm2:        nn.Layernorm(D, T),
+	ff:           nn.Linear(D, T),
+	ff_proj:      nn.Linear(D, T),
+	act:          Transformer_Activations(D, T),
 }
 
 Transformer_Activations :: struct($D, $T: typeid) {
-	norm1: Array(D, T),
-	qkv: Array(D, T),
-	att: Array(D, T),
-	res: Array(D, T),
-	norm2: Array(D, T),
-	ff_out: Array(D, T),
+	norm1:   Array(D, T),
+	qkv:     Array(D, T),
+	att:     Array(D, T),
+	res:     Array(D, T),
+	norm2:   Array(D, T),
+	ff_out:  Array(D, T),
 	ff_gelu: Array(D, T),
 }
 
@@ -280,12 +288,12 @@ make_transformer :: proc($D, $T: typeid, cfg: ^Config, layer: int) -> ^Transform
 	t := new(Transformer(D, T))
 	t.config = cfg
 	t.norm1 = nn.make_layernorm(D, T, name(buf[:], layer, "norm1"), cfg.channels)
-	t.pre_att = nn.make_linear(D, T, name(buf[:], layer, "pre_att"), cfg.channels, 3*cfg.channels, bias=bias)
+	t.pre_att = nn.make_linear(D, T, name(buf[:], layer, "pre_att"), cfg.channels, 3 * cfg.channels, bias = bias)
 	t.attn = nn.make_attention(D, T, name(buf[:], layer, "attn"), cfg.num_heads, cfg.channels)
-	t.att_proj = nn.make_linear(D, T, name(buf[:], layer, "att_proj"), cfg.channels, cfg.channels, bias=bias)
+	t.att_proj = nn.make_linear(D, T, name(buf[:], layer, "att_proj"), cfg.channels, cfg.channels, bias = bias)
 	t.norm2 = nn.make_layernorm(D, T, name(buf[:], layer, "norm2"), cfg.channels)
-	t.ff = nn.make_linear(D, T, name(buf[:], layer, "ff"), cfg.channels, 4*cfg.channels, bias=bias)
-	t.ff_proj = nn.make_linear(D, T, name(buf[:], layer, "ff_proj"), 4*cfg.channels, cfg.channels, bias=bias)
+	t.ff = nn.make_linear(D, T, name(buf[:], layer, "ff"), cfg.channels, 4 * cfg.channels, bias = bias)
+	t.ff_proj = nn.make_linear(D, T, name(buf[:], layer, "ff_proj"), 4 * cfg.channels, cfg.channels, bias = bias)
 
 	t.type = "Transformer"
 	t.name = fmt.aprintf("block%d", layer)
@@ -315,7 +323,7 @@ transformer_forward :: proc(t: ^Transformer($Dev, $Typ), inp, out: Array(Dev, Ty
 	nn.linear_forward(&t.ff, t.act.norm2, t.act.ff_out)
 	ff_gelu := t.act.ff_gelu
 	if t.recompute_gelu {
-		ff_gelu = array.zeros(Dev, Typ, {B, T, 4*C})
+		ff_gelu = array.zeros(Dev, Typ, {B, T, 4 * C})
 	}
 	nn.gelu_forward(t.act.ff_out, ff_gelu)
 	nn.linear_forward(&t.ff_proj, ff_gelu, tmp)
@@ -327,12 +335,12 @@ transformer_forward :: proc(t: ^Transformer($Dev, $Typ), inp, out: Array(Dev, Ty
 
 transformer_backward :: proc(t: ^Transformer($Dev, $Typ), inp, dout, din: Array(Dev, Typ), loc := #caller_location) {
 	B, T, C := inp.dims[0], inp.dims[1], t.attn.channels
-	tmp1 := array.zeros(Dev, Typ, {B, T, 4*C})
+	tmp1 := array.zeros(Dev, Typ, {B, T, 4 * C})
 	defer array.delete(tmp1)
 	array.copy(din, dout)
 	ff_gelu := t.act.ff_gelu
 	if t.recompute_gelu {
-		ff_gelu = array.zeros(Dev, Typ, {B, T, 4*C})
+		ff_gelu = array.zeros(Dev, Typ, {B, T, 4 * C})
 		nn.gelu_forward(t.act.ff_out, ff_gelu)
 	}
 	nn.linear_backward(&t.ff_proj, ff_gelu, dout, tmp1)
@@ -344,7 +352,7 @@ transformer_backward :: proc(t: ^Transformer($Dev, $Typ), inp, dout, din: Array(
 	nn.linear_backward(&t.ff, t.act.norm2, tmp1, tmp2)
 	nn.layernorm_backward(&t.norm2, t.act.res, tmp2, din)
 	nn.linear_backward(&t.att_proj, t.act.att, din, tmp2)
-	tmp3 := array.view(tmp1, {B, T, 3*C})
+	tmp3 := array.view(tmp1, {B, T, 3 * C})
 	nn.attention_backward(&t.attn, t.act.qkv, tmp2, tmp3)
 	nn.linear_backward(&t.pre_att, t.act.norm1, tmp3, tmp2)
 	nn.layernorm_backward(&t.norm1, inp, tmp2, din)
@@ -354,13 +362,13 @@ build_transformer :: proc(t: ^Transformer($Dev, $Typ), B, T: int) {
 	delete_transformer_activations(&t.act)
 	C := t.attn.channels
 	t.act.norm1 = array.zeros(Dev, Typ, {B, T, C})
-	t.act.qkv = array.zeros(Dev, Typ, {B, T, 3*C})
+	t.act.qkv = array.zeros(Dev, Typ, {B, T, 3 * C})
 	t.act.att = array.zeros(Dev, Typ, {B, T, C})
 	t.act.res = array.zeros(Dev, Typ, {B, T, C})
 	t.act.norm2 = array.zeros(Dev, Typ, {B, T, C})
-	t.act.ff_out = array.zeros(Dev, Typ, {B, T, 4*C})
+	t.act.ff_out = array.zeros(Dev, Typ, {B, T, 4 * C})
 	if !t.recompute_gelu {
-		t.act.ff_gelu = array.zeros(Dev, Typ, {B, T, 4*C})
+		t.act.ff_gelu = array.zeros(Dev, Typ, {B, T, 4 * C})
 	}
 }
 

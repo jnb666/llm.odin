@@ -1,8 +1,8 @@
 package nn
 
-import "core:testing"
 import "core:log"
 import "core:math/rand"
+import "core:testing"
 
 import "../array"
 import "../util"
@@ -26,7 +26,7 @@ expect_slice :: proc(t: ^testing.T, name: string, out: Array($D, $T), expected: 
 	array.copy(res, out)
 	diff := util.max_difference(res, expected)
 	log.debugf("%s delta = %g\n% 10.4g", name, diff, out)
-	testing.expect(t, diff <= max_diff, loc=loc)
+	testing.expect(t, diff <= max_diff, loc = loc)
 }
 
 @(test)
@@ -43,7 +43,7 @@ add_test_cuda :: proc(t: ^testing.T) {
 }
 
 add_test_on :: proc(t: ^testing.T, $Device, $T: typeid) {
-	x := array.new(Device, T, {3, 4}, util.seq(f32, 1, 13), move=true)
+	x := array.new(Device, T, {3, 4}, util.seq(f32, 1, 13), move = true)
 	defer array.delete(x)
 	y := array.zeros_like(x)
 	array.fill(y, 10)
@@ -62,9 +62,9 @@ linear_test_cpu :: proc(t: ^testing.T) {
 @(test)
 linear_test_cuda :: proc(t: ^testing.T) {
 	context.user_ptr = init_cuda()
-	defer end_cuda()	
+	defer end_cuda()
 	linear_test_on(t, Cuda, f32)
-	linear_test_on(t, Cuda, BF16, max_diff=0.02)
+	linear_test_on(t, Cuda, BF16, max_diff = 0.02)
 }
 
 @(test)
@@ -77,7 +77,7 @@ linear_bwd_test_cuda :: proc(t: ^testing.T) {
 	context.user_ptr = init_cuda()
 	defer end_cuda()
 	linear_bwd_test_on(t, Cuda, f32)
-	linear_bwd_test_on(t, Cuda, BF16, max_diff=0.01)
+	linear_bwd_test_on(t, Cuda, BF16, max_diff = 0.01)
 }
 
 
@@ -85,12 +85,12 @@ linear_test_on :: proc(t: ^testing.T, $Device, $Type: typeid, max_diff: f32 = 1e
 	B, T, C, OC := 1, 4, 2, 3
 	l := make_linear_layer(Device, Type, C, OC)
 	defer delete_layer(l)
-	
+
 	input := array.new(Device, Type, {B, T, C}, []f32{1, 2, 0.5, 1, -2, -1, 1.1, 2})
 	defer array.delete(input)
 	output := array.zeros(Device, Type, {B, T, OC})
 	defer array.delete(output)
-	
+
 	linear_forward(&l, input, output)
 	expect_slice(t, "output", output, {6, 13, 20, 3.5, 7.5, 11.5, -3, -8, -13, 6.1, 13.3, 20.5}, max_diff)
 }
@@ -120,15 +120,15 @@ linear_bwd_test_on :: proc(t: ^testing.T, $Device, $Type: typeid, max_diff: f32 
 }
 
 make_linear_layer :: proc($Device, $Type: typeid, C, OC: int) -> Linear(Device, Type) {
-	l := make_linear(Device, Type, "linear", C, OC, bias=true)
+	l := make_linear(Device, Type, "linear", C, OC, bias = true)
 	log.debug(l.info)
-	s1 := util.seq(f32, 1, C*OC+1)
+	s1 := util.seq(f32, 1, C * OC + 1)
 	defer delete(s1)
 	array.copy(l.weight.arr, s1)
-	s2 := util.seq(f32, 1, OC+1)
+	s2 := util.seq(f32, 1, OC + 1)
 	defer delete(s2)
 	array.copy(l.bias.arr, s2)
-	return l	
+	return l
 }
 
 @(test)
@@ -201,12 +201,12 @@ layernorm_test_cpu :: proc(t: ^testing.T) {
 layernorm_test_cuda :: proc(t: ^testing.T) {
 	context.user_ptr = init_cuda()
 	defer end_cuda()
-	layernorm_test_on(t, Cuda, BF16, max_diff=0.1)
+	layernorm_test_on(t, Cuda, BF16, max_diff = 0.1)
 }
 
 @(test)
 layernorm_bwd_test_cpu :: proc(t: ^testing.T) {
-	layernorm_test_on(t, CPU, f32, backward=true)
+	layernorm_test_on(t, CPU, f32, backward = true)
 }
 
 layernorm_test_on :: proc(t: ^testing.T, $Device, $Type: typeid, backward := false, max_diff: f32 = 1e-6) {
@@ -234,9 +234,9 @@ layernorm_test_on :: proc(t: ^testing.T, $Device, $Type: typeid, backward := fal
 	defer array.delete(din)
 
 	layernorm_backward(&l, input, dout, din)
-	expect_slice(t, "din", din, {-1.2238272, 0.61099726, 0.61283004, -5.01e-05, -1.3256139, 1.3256639}, max_diff)	
-	expect_slice(t, "dscale", l.scale.grad, {-0.5656058, 0.17943905, 0.437849}, max_diff)	
-	expect_slice(t, "dbias", l.bias.grad, {-0.3, -0.4, 0.2}, max_diff)	
+	expect_slice(t, "din", din, {-1.2238272, 0.61099726, 0.61283004, -5.01e-05, -1.3256139, 1.3256639}, max_diff)
+	expect_slice(t, "dscale", l.scale.grad, {-0.5656058, 0.17943905, 0.437849}, max_diff)
+	expect_slice(t, "dbias", l.bias.grad, {-0.3, -0.4, 0.2}, max_diff)
 }
 
 
@@ -247,7 +247,7 @@ attention_test_cpu :: proc(t: ^testing.T) {
 	defer delete_layer(l)
 	log.debug(l.info)
 
-	input := array.new(CPU, f32, {B, T, 3*C}, util.seq(f32, 1, 19), move=true)
+	input := array.new(CPU, f32, {B, T, 3 * C}, util.seq(f32, 1, 19), move = true)
 	defer array.delete(input)
 	output := array.zeros(CPU, f32, {B, T, C})
 	defer array.delete(output)
@@ -266,7 +266,7 @@ attention_bwd_test_cpu :: proc(t: ^testing.T) {
 	defer delete_layer(l)
 	log.debug(l.info)
 
-	input := array.new(CPU, f32, {B, T, 3*C}, util.seq(f32, 1, 7), move=true)
+	input := array.new(CPU, f32, {B, T, 3 * C}, util.seq(f32, 1, 7), move = true)
 	defer array.delete(input)
 	output := array.zeros(CPU, f32, {B, T, C})
 	defer array.delete(output)
@@ -279,7 +279,7 @@ attention_bwd_test_cpu :: proc(t: ^testing.T) {
 
 	dout := array.new(CPU, f32, {B, T, C}, []f32{0.1, -0.2})
 	defer array.delete(dout)
-	din := array.zeros(CPU, f32, {B, T, 3*C})
+	din := array.zeros(CPU, f32, {B, T, 3 * C})
 	defer array.delete(din)
 
 	attention_backward(&l, input, dout, din)
@@ -300,7 +300,7 @@ attention_test_cuda :: proc(t: ^testing.T) {
 	defer array.delete(out_cuda)
 	log.debugf("Cuda output % 8.3f", out_cuda)
 
-	testing.expect(t, array.compare("out", out_cuda, out_cpu, epsilon=0.01, quiet=true))
+	testing.expect(t, array.compare("out", out_cuda, out_cpu, epsilon = 0.01, quiet = true))
 }
 
 @(test)
@@ -308,15 +308,15 @@ attention_bwd_test_cuda :: proc(t: ^testing.T) {
 	context.user_ptr = init_cuda()
 	defer end_cuda()
 
-	din_cpu := attention_test_on(CPU, f32, backward=true)
+	din_cpu := attention_test_on(CPU, f32, backward = true)
 	defer array.delete(din_cpu)
 	log.debugf("CPU din % 8.3f", din_cpu)
 
-	din_cuda := attention_test_on(Cuda, BF16, backward=true)
+	din_cuda := attention_test_on(Cuda, BF16, backward = true)
 	defer array.delete(din_cuda)
 	log.debugf("Cuda din % 8.3f", din_cuda)
 
-	testing.expect(t, array.compare("din", din_cuda, din_cpu, epsilon=0.1, threshold=0.01, quiet=true))
+	testing.expect(t, array.compare("din", din_cuda, din_cpu, epsilon = 0.1, threshold = 0.01, quiet = true))
 }
 
 attention_test_on :: proc($Device, $Type: typeid, backward := false) -> Array(Device, Type) {
@@ -326,12 +326,12 @@ attention_test_on :: proc($Device, $Type: typeid, backward := false) -> Array(De
 	defer delete_layer(l)
 	log.debug(l.info)
 
-	input := array.zeros(Device, Type, {B, T, 3*C})
+	input := array.zeros(Device, Type, {B, T, 3 * C})
 	defer array.delete(input)
 	array.initialize(input, uniform_init_func)
 
 	output := array.zeros(Device, Type, {B, T, C})
-	attention_forward(&l, input, output, train=backward)
+	attention_forward(&l, input, output, train = backward)
 	if !backward {
 		return output
 	}
@@ -342,7 +342,7 @@ attention_test_on :: proc($Device, $Type: typeid, backward := false) -> Array(De
 	defer array.delete(dout)
 	array.initialize(dout, uniform_init_func)
 
-	din := array.zeros(Device, Type, {B, T, 3*C})
+	din := array.zeros(Device, Type, {B, T, 3 * C})
 	attention_backward(&l, input, dout, din)
 	return din
 }
@@ -360,7 +360,7 @@ gelu_test_cuda :: proc(t: ^testing.T) {
 	defer array.delete(out_cuda)
 	log.debugf("Cuda output %.2g", out_cuda)
 
-	testing.expect(t, array.compare("out", out_cuda, out_cpu, epsilon=0.05, quiet=true))
+	testing.expect(t, array.compare("out", out_cuda, out_cpu, epsilon = 0.05, quiet = true))
 }
 
 gelu_test_on :: proc($Device, $Type: typeid) -> Array(Device, Type) {
@@ -388,11 +388,11 @@ cross_entropy_test_cuda :: proc(t: ^testing.T) {
 
 	log.debug("CPU loss", loss_cpu)
 	log.debug("Cuda loss", loss_cuda)
-	testing.expect(t, array.compare("loss", loss_cuda, loss_cpu, epsilon=0.01, quiet=true))
+	testing.expect(t, array.compare("loss", loss_cuda, loss_cpu, epsilon = 0.01, quiet = true))
 
 	log.debug("CPU dlogits", din_cpu)
 	log.debug("Cuda dlogits", din_cuda)
-	testing.expect(t, array.compare("dlogits", din_cuda, din_cpu, epsilon=0.01, quiet=true))
+	testing.expect(t, array.compare("dlogits", din_cuda, din_cpu, epsilon = 0.01, quiet = true))
 }
 
 cross_entropy_test_on :: proc($Device, $Type: typeid) -> (Array(Device, f32), Array(Device, Type)) {
@@ -406,7 +406,7 @@ cross_entropy_test_on :: proc($Device, $Type: typeid) -> (Array(Device, f32), Ar
 	array.initialize(targets, integer_init_func)
 
 	losses := array.zeros(Device, f32, {B, T})
-	cross_entropy_loss(logits, targets, losses, V, train=true)
+	cross_entropy_loss(logits, targets, losses, V, train = true)
 	return losses, logits
 }
 
@@ -422,9 +422,9 @@ adamw_test :: proc(t: ^testing.T) {
 	cuda_model := make_test_model(Cuda, BF16)
 	defer delete_test_model(cuda_model)
 
-	cpu_opt := new_optimizer(&cpu_model, learning_rate=0.1)
+	cpu_opt := new_optimizer(&cpu_model, learning_rate = 0.1)
 	defer delete_optimizer(cpu_opt)
-	cuda_opt := new_optimizer(&cuda_model, learning_rate=0.1)
+	cuda_opt := new_optimizer(&cuda_model, learning_rate = 0.1)
 	defer delete_optimizer(cuda_opt)
 
 	epsilon, threshold: f32 = 0.1, 0.005
@@ -439,9 +439,9 @@ adamw_test :: proc(t: ^testing.T) {
 		log.debugf("step %d CPU norm=%.4g, Cuda norm=%.4g", step, cpu_norm, cuda_norm)
 		testing.expect(t, util.nearly_equal(cuda_norm, cpu_norm, epsilon, threshold))
 		for i in 0 ..< len(cpu_model.params) {
-			testing.expect(t, array.compare("m", cuda_opt.param_m[i], cpu_opt.param_m[i], epsilon, threshold, quiet=true))
-			testing.expect(t, array.compare("v", cuda_opt.param_v[i], cpu_opt.param_v[i], epsilon, threshold, quiet=true))
-			testing.expect(t, array.compare("weight", cuda_opt.weights[i], cpu_model.params[i].arr, epsilon, threshold, quiet=true))
+			testing.expect(t, array.compare("m", cuda_opt.param_m[i], cpu_opt.param_m[i], epsilon, threshold, quiet = true))
+			testing.expect(t, array.compare("v", cuda_opt.param_v[i], cpu_opt.param_v[i], epsilon, threshold, quiet = true))
+			testing.expect(t, array.compare("weight", cuda_opt.weights[i], cpu_model.params[i].arr, epsilon, threshold, quiet = true))
 		}
 	}
 }
@@ -453,7 +453,7 @@ make_test_model :: proc($D, $T: typeid) -> (m: Layer(D, T)) {
 	for &p in m.params {
 		p.arr = array.zeros(D, T, {4, 8})
 		p.grad = array.zeros(D, T, {4, 8})
-		array.initialize(p.arr, uniform_init_func)	
+		array.initialize(p.arr, uniform_init_func)
 	}
 	return m
 }
@@ -465,4 +465,3 @@ delete_test_model :: proc(m: Layer($D, $T)) {
 	}
 	delete(m.params)
 }
-

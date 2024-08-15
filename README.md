@@ -18,6 +18,8 @@ Tested on Linux with Cuda 12.6 and cuDNN 9.3.0
 
 - For stack traces in debug mode install [back](https://github.com/laytan/back) under the project root dir
 
+- curl should be installed under $PATH for downloading files
+
 - Under root dir for this project:
   - clone this repo  `git clone git clone https://github.com/jnb666/llm.odin.git llm`
   - run tests: `cd llm/gpt2; odin test . -all-packages`

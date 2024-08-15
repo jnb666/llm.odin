@@ -1,11 +1,11 @@
 package cuda
 
-import "core:testing"
-import "core:log"
+import "../util"
 import "core:fmt"
+import "core:log"
 import "core:mem"
 import "core:slice"
-import "../util"
+import "core:testing"
 
 @(test)
 device_test :: proc(t: ^testing.T) {
@@ -65,7 +65,7 @@ void axpy(float alpha, float *x, float *y, size_t n) {
 
 @(test)
 compile_test :: proc(t: ^testing.T) {
-	ptx := compile_test_func(t, verbose=true)
+	ptx := compile_test_func(t, verbose = true)
 	defer delete(ptx)
 }
 
@@ -74,7 +74,7 @@ launch_test :: proc(t: ^testing.T) {
 	ptx := compile_test_func(t)
 	defer delete(ptx)
 
-	ctx := create_context(ptx=ptx)
+	ctx := create_context(ptx = ptx)
 	defer destroy_context(ctx)
 	context.user_ptr = ctx
 
@@ -91,7 +91,7 @@ launch_test :: proc(t: ^testing.T) {
 	xa := make([]f32, size)
 	defer delete(xa)
 	for i in 0 ..< size {
-		xa[i] = f32(i+1)
+		xa[i] = f32(i + 1)
 	}
 	memcpyHtoD(x, raw_data(xa), bsize)
 
@@ -99,16 +99,16 @@ launch_test :: proc(t: ^testing.T) {
 	memsetD32(y, transmute(u32)(y_val), size)
 
 	alpha := f32(0.01)
-	launch_kernel(fn, blockX=util.ceil_div(size, BLOCK), gridX=BLOCK, params={&alpha, &x, &y, &size})
+	launch_kernel(fn, blockX = util.ceil_div(size, BLOCK), gridX = BLOCK, params = {&alpha, &x, &y, &size})
 	synchronize()
 
 	res := make([]f32, size)
 	defer delete(res)
 	memcpyDtoH(raw_data(res), y, bsize)
-	log.debugf("out: %.2f .. %.2f", res[:5], res[size-5:])
+	log.debugf("out: %.2f .. %.2f", res[:5], res[size - 5:])
 
 	for v, i in res {
-		exp := alpha*f32(i+1) + y_val
-		testing.expect(t, abs(v-exp) < 1e-6)
+		exp := alpha * f32(i + 1) + y_val
+		testing.expect(t, abs(v - exp) < 1e-6)
 	}
 }

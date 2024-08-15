@@ -1,36 +1,43 @@
 package nn
 
-import "core:log"
-import "core:math"
 import "../array"
 import "../cuda"
 import "../util"
+import "core:log"
+import "core:math"
 
 // AdamW optimizer config settings
 AdamW_Config :: struct {
 	learning_rate: f32,
-	weight_decay: f32,
+	weight_decay:  f32,
 	gradient_clip: f32,
-	beta1: f32,
-	beta2: f32,
-	epsilon: f32,	
+	beta1:         f32,
+	beta2:         f32,
+	epsilon:       f32,
 }
 
 // AdamW optimizer state
 AdamW :: struct($D, $T: typeid) {
 	using config: AdamW_Config,
-	steps: int,
-	params: [dynamic]^Parameter(D, T),
-	weights: [dynamic]Array(D, f32),
-	param_m: [dynamic]Array(D, f32),
-	param_v: [dynamic]Array(D, f32),
+	steps:        int,
+	params:       [dynamic]^Parameter(D, T),
+	weights:      [dynamic]Array(D, f32),
+	param_m:      [dynamic]Array(D, f32),
+	param_v:      [dynamic]Array(D, f32),
 }
 
 // Create new optimizer
-new_optimizer :: proc(model: ^Layer($D, $T), learning_rate: f32 = 3e-4, weight_decay: f32 = 0, 
-					 gradient_clip: f32 = 0, beta1: f32 = 0.9, beta2: f32 = 0.95, epsilon: f32 = 1e-8) -> ^AdamW(D, T) {
+new_optimizer :: proc(
+	model: ^Layer($D, $T),
+	learning_rate: f32 = 3e-4,
+	weight_decay: f32 = 0,
+	gradient_clip: f32 = 0,
+	beta1: f32 = 0.9,
+	beta2: f32 = 0.95,
+	epsilon: f32 = 1e-8,
+) -> ^AdamW(D, T) {
 	opt := new(AdamW(D, T))
-	opt.config = { learning_rate, weight_decay, gradient_clip, beta1, beta2, epsilon }
+	opt.config = {learning_rate, weight_decay, gradient_clip, beta1, beta2, epsilon}
 	init_optimizer(opt, model)
 	log.debugf("AdamW optimizer - model = %s, %d parameters", model.name, len(opt.params))
 	return opt
@@ -74,7 +81,10 @@ delete_optimizer :: proc(opt: ^AdamW($D, $T)) {
 }
 
 // Apply one batch step - updates model weights from the gradients + optimizer parameters - returns gradient norm
-optimizer_step :: proc{optimizer_step_cpu, optimizer_step_cuda}
+optimizer_step :: proc {
+	optimizer_step_cpu,
+	optimizer_step_cuda,
+}
 
 grad_scale :: proc(norm, clip: f32) -> f32 {
 	scale: f32 = 1
@@ -91,7 +101,7 @@ optimizer_step_cpu :: proc(opt: ^AdamW(CPU, f32), model: ^Layer(CPU, f32)) -> f3
 	for p in opt.params {
 		grads := array.ptr(p.grad)
 		for v in grads[:p.size] {
-			norm_sq += v*v
+			norm_sq += v * v
 		}
 	}
 	norm := math.sqrt(norm_sq)
@@ -105,15 +115,15 @@ optimizer_step_cpu :: proc(opt: ^AdamW(CPU, f32), model: ^Layer(CPU, f32)) -> f3
 		m, v := array.ptr(opt.param_m[i]), array.ptr(opt.param_v[i])
 		wdecay: f32 = p.ndims > 1 ? opt.weight_decay : 1
 		for j in 0 ..< p.size {
-			grad := grads[j]*scale
+			grad := grads[j] * scale
 			// momentum update
-			m[j] = opt.beta1*m[j] + (1-opt.beta1)*grad
+			m[j] = opt.beta1 * m[j] + (1 - opt.beta1) * grad
 			// RMSprop update
-			v[j] = opt.beta2*v[j] + (1-opt.beta2)*grad*grad
+			v[j] = opt.beta2 * v[j] + (1 - opt.beta2) * grad * grad
 			// bias correction
-			bias_c := (m[j] / beta1c) / (math.sqrt(v[j]/beta2c) + opt.epsilon)
+			bias_c := (m[j] / beta1c) / (math.sqrt(v[j] / beta2c) + opt.epsilon)
 			// weight update
-			weights[j] -= opt.learning_rate*(bias_c + wdecay*weights[j])
+			weights[j] -= opt.learning_rate * (bias_c + wdecay * weights[j])
 		}
 	}
 	return norm
@@ -133,7 +143,7 @@ optimizer_step_cuda :: proc(opt: ^AdamW(Cuda, BF16), model: ^Layer(Cuda, BF16)) 
 	sump := array.ptr(sum)
 	for p in opt.params {
 		grads, size := array.ptr(p.grad), p.size
-		cuda.launch_kernel(fn, gridX=grid, blockX=BLOCK, params={&sump, &grads, &size})
+		cuda.launch_kernel(fn, gridX = grid, blockX = BLOCK, params = {&sump, &grads, &size})
 	}
 	norm_sq: [1]f32
 	array.copy(norm_sq[:], sum)
@@ -150,11 +160,13 @@ optimizer_step_cuda :: proc(opt: ^AdamW(Cuda, BF16), model: ^Layer(Cuda, BF16)) 
 		weights, grads, size := array.ptr(p.arr), array.ptr(p.grad), p.size
 		w32, m, v := array.ptr(opt.weights[i]), array.ptr(opt.param_m[i]), array.ptr(opt.param_v[i])
 		wdecay: f32 = p.ndims > 1 ? opt.weight_decay : 1
-		
-		cuda.launch_kernel(fn, gridX=util.ceil_div(size, BLOCK), blockX=BLOCK, 
-			params={&w32, &weights, &grads, &m, &v, &size, &opt.learning_rate, &wdecay, 
-					&opt.beta1, &opt.beta2, &beta1c, &beta2c, &opt.epsilon, &scale})
+
+		cuda.launch_kernel(
+			fn,
+			gridX = util.ceil_div(size, BLOCK),
+			blockX = BLOCK,
+			params = {&w32, &weights, &grads, &m, &v, &size, &opt.learning_rate, &wdecay, &opt.beta1, &opt.beta2, &beta1c, &beta2c, &opt.epsilon, &scale},
+		)
 	}
 	return norm
 }
-

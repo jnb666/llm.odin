@@ -1,40 +1,40 @@
 package plot
 
+import "core:encoding/json"
+import "core:fmt"
 import "core:log"
 import "core:strings"
-import "core:fmt"
-import "core:encoding/json"
-import "core:time"
-import "core:thread"
 import "core:sync"
+import "core:thread"
+import "core:time"
 
 Max_Line_Length :: 100
 
 // Webview plotting context
 Context :: struct {
-	thread: ^thread.Thread,
-	webview: Webview,
-	width: int,
-	height: int,
-	border: int,
+	thread:       ^thread.Thread,
+	webview:      Webview,
+	width:        int,
+	height:       int,
+	border:       int,
 	table_header: int,
-	log_level: log.Level,
-	log_opts: log.Options,
-	loaded: bool,
+	log_level:    log.Level,
+	log_opts:     log.Options,
+	loaded:       bool,
 }
 
 // Stats represents a series of traces which are rendered using plotly
 Stats :: struct {
-	traces: [dynamic]Trace,
+	traces:  [dynamic]Trace,
 	samples: [dynamic]Sample,
 }
 
 // One plot trace is a series of x,y points and associated metadata
 Trace :: struct {
-	x: [dynamic]i32,
-	y: [dynamic]f32,
-	name: string,
-	line: struct {
+	x:       [dynamic]i32,
+	y:       [dynamic]f32,
+	name:    string,
+	line:    struct {
 		width: int,
 	},
 	opacity: f64,
@@ -42,9 +42,9 @@ Trace :: struct {
 
 // Sample is a text generation sample
 Sample :: struct {
-	step: int,
+	step:    int,
 	preview: string,
-	text: string,
+	text:    string,
 }
 
 // Create new thread to open a webview window
@@ -59,13 +59,13 @@ start :: proc(width, height: int, border := 10, table_header := 20, xrange: []in
 	c.thread = thread.create_and_start_with_poly_data(c, webview_thread)
 	// ensure JS initialization has completed
 	for !sync.atomic_load(&c.loaded) {
-		time.sleep(10*time.Millisecond)
+		time.sleep(10 * time.Millisecond)
 	}
 	if xrange != nil && len(xrange) >= 1 {
 		if len(xrange) == 1 {
 			set_xrange(c, 0, xrange[0])
 		} else {
-			set_xrange(c, xrange[0], xrange[1])	
+			set_xrange(c, xrange[0], xrange[1])
 		}
 	}
 	return c
@@ -96,7 +96,7 @@ delete_stats :: proc(s: ^Stats) {
 // Set x axis range xmin to xmax
 set_xrange :: proc(c: ^Context, xmin, xmax: int) -> Webview_Error {
 	update := fmt.aprintf("setXRange(%d, %d)\x00", xmin, xmax)
-	defer delete(update)	
+	defer delete(update)
 	log.debug(update)
 	return webview_eval(c.webview, strings.unsafe_string_to_cstring(update))
 }
@@ -129,7 +129,7 @@ add :: proc(s: ^Stats, name: string, x: int, y: f32, width := 2, opacity := 1.0)
 			return
 		}
 	}
-	append(&s.traces, Trace{x={i32(x)}, y={y}, name=name, line={width=width}, opacity=opacity})
+	append(&s.traces, Trace{x = {i32(x)}, y = {y}, name = name, line = {width = width}, opacity = opacity})
 }
 
 // Add text sample - makes a copy of the input text
@@ -140,7 +140,7 @@ add_sample :: proc(s: ^Stats, step: int, text: string) {
 		end = n
 	}
 	end = min(end, Max_Line_Length)
-	append(&s.samples, Sample{step=step, preview=text[:end], text=text})
+	append(&s.samples, Sample{step = step, preview = text[:end], text = text})
 }
 
 webview_thread :: proc(c: ^Context) {
@@ -151,8 +151,8 @@ webview_thread :: proc(c: ^Context) {
 	}
 	webview_set_title(w, "Odin llm plot")
 	webview_set_size(w, i32(c.width), i32(c.height), .NONE)
-	height := f64(c.height - 2*c.border)
-	content := get_html(c.width-2*c.border, int(height*0.6), c.table_header, int(height*0.4)-c.table_header)
+	height := f64(c.height - 2 * c.border)
+	content := get_html(c.width - 2 * c.border, int(height * 0.6), c.table_header, int(height * 0.4) - c.table_header)
 	must(webview_set_html(w, content))
 	delete(content)
 	// called from webview JS once initialization is done
@@ -174,4 +174,3 @@ get_html :: proc(width, plot_height, table_header, table_body: int) -> cstring {
 	//log.debug(html)
 	return strings.clone_to_cstring(html)
 }
-

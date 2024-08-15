@@ -1,13 +1,13 @@
 package array
 
-import "base:intrinsics"
-import "core:io"
 import "../cuda"
 import "../util"
+import "base:intrinsics"
+import "core:io"
 
 // Allocate a new device array with given dimensions and fill with zeros
 zeros_cuda :: proc($D, $T: typeid, dims: []int, loc := #caller_location) -> (a: Array(D, T)) where D == Cuda {
-	a.shape = make_shape(dims, loc=loc)
+	a.shape = make_shape(dims, loc = loc)
 	a.dptr = cast([^]T)cuda.memalloc(a.size * size_of(T))
 	zero_cuda(a)
 	return a
@@ -27,7 +27,7 @@ to_host :: proc(a: Array(Cuda, $T)) -> (dst: Array(CPU, T)) {
 	if a.dptr != nil {
 		s := a.shape
 		dst = zeros(CPU, T, shape(&s))
-		cuda.memcpyDtoH(dst.dptr, ptr(a), a.size*size_of(T))
+		cuda.memcpyDtoH(dst.dptr, ptr(a), a.size * size_of(T))
 	}
 	return dst
 }
@@ -37,7 +37,7 @@ to_device :: proc(a: Array(CPU, $T)) -> (dst: Array(Cuda, T)) {
 	if a.dptr != nil {
 		s := a.shape
 		dst = zeros(Cuda, T, shape(&s))
-		cuda.memcpyHtoD(dst.dptr, ptr(a), a.size*size_of(T))
+		cuda.memcpyHtoD(dst.dptr, ptr(a), a.size * size_of(T))
 	}
 	return dst
 }
@@ -73,7 +73,7 @@ fill_cuda :: proc(a: Array(Cuda, $T), value: $V) where intrinsics.type_is_numeri
 copy_array_cuda :: proc(dst: Array(Cuda, $T), src: Array(Cuda, T)) {
 	n := min(dst.size, src.size)
 	if n > 0 {
-		cuda.memcpyDtoD(ptr(dst), ptr(src), n*size_of(T))
+		cuda.memcpyDtoD(ptr(dst), ptr(src), n * size_of(T))
 	}
 }
 
@@ -89,7 +89,7 @@ copy_array_to_slice_cuda :: proc(dst: []$V, src: Array(Cuda, $T)) {
 		dst_a := make([]T, n)
 		defer delete(dst_a)
 	}
-	cuda.memcpyDtoH(raw_data(dst_a), ptr(src), n*size_of(T))
+	cuda.memcpyDtoH(raw_data(dst_a), ptr(src), n * size_of(T))
 	when T != V {
 		convert_slice(dst, dst_a)
 	}
@@ -108,7 +108,7 @@ copy_slice_to_array_cuda :: proc(dst: Array(Cuda, $T), src: []$V) {
 		defer delete(src_a)
 		convert_slice(src_a, src)
 	}
-	cuda.memcpyHtoD(ptr(dst), raw_data(src_a), n*size_of(T))
+	cuda.memcpyHtoD(ptr(dst), raw_data(src_a), n * size_of(T))
 }
 
 // Read data from stream into array

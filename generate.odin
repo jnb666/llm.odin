@@ -1,10 +1,10 @@
 package main
 
-import "core:log"
 import "core:fmt"
-import "core:time"
-import "core:strings"
+import "core:log"
 import "core:os"
+import "core:strings"
+import "core:time"
 
 import "gpt2"
 import "nn"
@@ -12,36 +12,36 @@ import "util"
 
 
 Generate_Options :: struct {
-	debug: bool `usage:"enable debug logging"`,
-	track: bool `usage:"use tracking allocator to find memory leaks"`,
-	cuda: bool `usage:"use Cuda acceleration - default true"`,
-	model: string `usage:"model checkpoint file - default gpt2_124M.bin"`,
-	prompt: string `usage:"input prompt string"`,
+	debug:   bool `usage:"enable debug logging"`,
+	track:   bool `usage:"use tracking allocator to find memory leaks"`,
+	cuda:    bool `usage:"use Cuda acceleration - default true"`,
+	model:   string `usage:"model checkpoint file - default gpt2_124M.bin"`,
+	prompt:  string `usage:"input prompt string"`,
 	verbose: bool `usage:"show verbose output"`,
-	maxlen: int `usage:"max number of tokens generated- defalt 256"`,
+	maxlen:  int `usage:"max number of tokens generated- defalt 256"`,
 	sampler: string `usage:"sampler type (greedy, random, top_k or top_p) - default top_p"`,
-	temp: f32 `usage:"sampler temerature - default 1.0"`,
-	topk: int `usage:"top k sampler cutoff - default 10"`,
-	topp: f32 `usage:"top p sampler cutoff - default 0.9"`,
+	temp:    f32 `usage:"sampler temerature - default 1.0"`,
+	topk:    int `usage:"top k sampler cutoff - default 10"`,
+	topp:    f32 `usage:"top p sampler cutoff - default 0.9"`,
 	nonstop: bool `usage:"don't stop generating text when get the end token"`,
 }
 
 Context :: struct {
 	using opt: ^Generate_Options,
-	tok: ^gpt2.Tokenizer,
-	ntokens: int,
+	tok:       ^gpt2.Tokenizer,
+	ntokens:   int,
 }
 
 // run session to generate sample text from the model
 generate_main :: proc(args: []string) {
-	opt := Generate_Options{
-		model 		= "gpt2_124M.bin",
-		maxlen		= 256,
-		sampler     = "top_p",
-		temp        = 1.0,
-		topk        = 10,
-		topp        = 0.9,
-		cuda        = true,
+	opt := Generate_Options {
+		model   = "gpt2_124M.bin",
+		maxlen  = 256,
+		sampler = "top_p",
+		temp    = 1.0,
+		topk    = 10,
+		topp    = 0.9,
+		cuda    = true,
 	}
 	parse_args(&opt, "llm generate", args)
 	run(generate_run, &opt)
@@ -75,7 +75,10 @@ generate_start :: proc($Device, $Type: typeid, opt: ^Generate_Options) {
 	tokenizer := gpt2.new_tokenizer()
 	defer gpt2.delete_tokenizer(tokenizer)
 
-	ctx := Context{opt=opt, tok=tokenizer}
+	ctx := Context {
+		opt = opt,
+		tok = tokenizer,
+	}
 	start := time.now()
 	prompt := get_prompt(opt.prompt, opt.debug)
 	defer delete(prompt)
@@ -85,11 +88,11 @@ generate_start :: proc($Device, $Type: typeid, opt: ^Generate_Options) {
 		fmt.printf("%v => %q\n", tokens, prompt)
 	}
 	stop := !opt.nonstop ? gpt2.End_Token_ID : -1
-	gpt2.generate(model, sampler, &ctx, generate_callback, tokens, max_length=opt.maxlen, stop_token=stop)
+	gpt2.generate(model, sampler, &ctx, generate_callback, tokens, max_length = opt.maxlen, stop_token = stop)
 
 	elapsed := time.duration_seconds(time.since(start))
 	fmt.println()
-	log.infof("Generated %d tokens in % .2fs - % .0fms/token", ctx.ntokens, elapsed, 1000*elapsed/f64(ctx.ntokens))
+	log.infof("Generated %d tokens in % .2fs - % .0fms/token", ctx.ntokens, elapsed, 1000 * elapsed / f64(ctx.ntokens))
 }
 
 get_prompt :: proc(s: string, debug: bool) -> string {
@@ -141,9 +144,3 @@ init_sampler :: proc(opt: ^Generate_Options) -> (s: nn.Sampler) {
 	}
 	return s
 }
-
-
-
-
-
-

@@ -1,7 +1,7 @@
 package cuda
 
-import "core:strings"
 import "core:log"
+import "core:strings"
 
 foreign import cuda "system:cuda"
 
@@ -13,21 +13,21 @@ Function :: distinct rawptr
 MemoryPool :: distinct rawptr
 
 UserContext :: struct {
-	ctx: Context,
-	mod: Module,
+	ctx:     Context,
+	mod:     Module,
 	handles: map[string]Handle,
-	cache: map[string]Handle,
+	cache:   map[string]Handle,
 }
 
 Handle :: struct {
-	ptr: rawptr,
-	destroy: proc(string, rawptr),
+	ptr:     rawptr,
+	destroy: proc(_: string, _: rawptr),
 }
 
-@(default_calling_convention="c", private)
+@(default_calling_convention = "c", private)
 foreign cuda {
-	cuInit :: proc(uint) -> Result ---
-	cuGetErrorName :: proc(error: Result, pstr: ^cstring) --- 
+	cuInit :: proc(_: uint) -> Result ---
+	cuGetErrorName :: proc(error: Result, pstr: ^cstring) ---
 	cuDriverGetVersion :: proc(version: ^i32) -> Result ---
 	cuDeviceGetCount :: proc(count: ^i32) -> Result ---
 	cuDeviceGetAttribute :: proc(pi: ^i32, attrib: Device_Attribute, dev: Device) -> Result ---
@@ -39,7 +39,7 @@ foreign cuda {
 	cuCtxCreate_v2 :: proc(ctx: ^Context, flags: u32, dev: Device) -> Result ---
 	cuCtxDestroy :: proc(ctx: Context) -> Result ---
 	cuCtxSynchronize :: proc() -> Result ---
-	cuCtxGetDevice :: proc(dev: ^Device) -> Result --- 
+	cuCtxGetDevice :: proc(dev: ^Device) -> Result ---
 	cuMemAllocAsync :: proc(dptr: ^rawptr, bytes: uint, stream: Stream) -> Result ---
 	cuMemFreeAsync :: proc(dptr: rawptr, stream: Stream) -> Result ---
 	cuMemcpyDtoH_v2 :: proc(dst, src: rawptr, bytes: uint) -> Result ---
@@ -48,10 +48,9 @@ foreign cuda {
 	cuMemsetD8_v2 :: proc(dst: rawptr, val: u8, n: uint) -> Result ---
 	cuMemsetD16_v2 :: proc(dst: rawptr, val: u16, n: uint) -> Result ---
 	cuMemsetD32_v2 :: proc(dst: rawptr, val: u32, n: uint) -> Result ---
- 	cuModuleLoadData :: proc(mod: ^Module, image: rawptr) -> Result ---
- 	cuModuleGetFunction :: proc(func: ^Function, mod: Module, name: cstring) -> Result ---
- 	cuLaunchKernel :: proc(func: Function, gridX, gridY, gridZ, blockX, blockY, blockZ, sharedMemBytes: u32,
- 						   stream: Stream, kernelParams, extra: rawptr) -> Result ---
+	cuModuleLoadData :: proc(mod: ^Module, image: rawptr) -> Result ---
+	cuModuleGetFunction :: proc(func: ^Function, mod: Module, name: cstring) -> Result ---
+	cuLaunchKernel :: proc(func: Function, gridX, gridY, gridZ, blockX, blockY, blockZ, sharedMemBytes: u32, stream: Stream, kernelParams, extra: rawptr) -> Result ---
 }
 
 @(init)
@@ -79,21 +78,23 @@ create_context :: proc(device := 0, ptx := "") -> ^UserContext {
 }
 
 // Register a new handle in user context - e.g. for cublas or cudnn
-register_handle :: proc(name: string, ptr: rawptr, destroy: proc(string, rawptr), ctx: ^UserContext = nil,
-						loc := #caller_location) {
+register_handle :: proc(name: string, ptr: rawptr, destroy: proc(_: string, _: rawptr), ctx: ^UserContext = nil, loc := #caller_location) {
 	ctx := ctx
 	if ctx == nil {
-		assert (context.user_ptr != nil, "cuda user context not set", loc)
+		assert(context.user_ptr != nil, "cuda user context not set", loc)
 		ctx = cast(^UserContext)context.user_ptr
 	}
-	ctx.handles[name] = {ptr = ptr, destroy = destroy}
+	ctx.handles[name] = {
+		ptr     = ptr,
+		destroy = destroy,
+	}
 }
 
 // Get handle from user context
 get_handle :: proc(name: string, ctx: ^UserContext = nil, loc := #caller_location) -> rawptr {
 	ctx := ctx
 	if ctx == nil {
-		assert (context.user_ptr != nil, "cuda user context not set", loc)
+		assert(context.user_ptr != nil, "cuda user context not set", loc)
 		ctx = cast(^UserContext)context.user_ptr
 	}
 	h := ctx.handles[name] or_else panic("handle not registered", loc)
@@ -121,7 +122,10 @@ driver_error :: proc(rc: Result) -> string {
 	return string(err)
 }
 
-error :: proc{driver_error, nvrtc_error}
+error :: proc {
+	driver_error,
+	nvrtc_error,
+}
 
 driver_must :: proc(rc: Result, loc := #caller_location) {
 	if rc != .SUCCESS {
@@ -129,12 +133,15 @@ driver_must :: proc(rc: Result, loc := #caller_location) {
 	}
 }
 
-must :: proc{driver_must, nvrtc_must}
+must :: proc {
+	driver_must,
+	nvrtc_must,
+}
 
 driver_version :: proc() -> (major, minor: int) {
 	version: i32
 	must(cuDriverGetVersion(&version))
-	return int(version/1000), int((version%1000)/10)
+	return int(version / 1000), int((version % 1000) / 10)
 }
 
 num_devices :: proc() -> int {
@@ -230,18 +237,26 @@ load_module :: proc(ptx: string) -> (Module, Result) {
 }
 
 get_function :: proc(name: cstring, loc := #caller_location) -> Function {
-	assert (context.user_ptr != nil, "cuda user context not set", loc)
+	assert(context.user_ptr != nil, "cuda user context not set", loc)
 	ctx := cast(^UserContext)context.user_ptr
 	func: Function
 	must(cuModuleGetFunction(&func, ctx.mod, name), loc)
 	return func
 }
 
-launch_kernel :: proc(func: Function, gridX := 1, gridY := 1, gridZ := 1, blockX := 1, blockY := 1, blockZ := 1, 
-						sharedMemBytes := 0, params: []rawptr = nil, loc := #caller_location) {
-	must(cuLaunchKernel(
-		func, u32(gridX), u32(gridY), u32(gridZ), u32(blockX), u32(blockY), u32(blockZ), 
-		u32(sharedMemBytes), nil, raw_data(params), nil), loc)
+launch_kernel :: proc(
+	func: Function,
+	gridX := 1,
+	gridY := 1,
+	gridZ := 1,
+	blockX := 1,
+	blockY := 1,
+	blockZ := 1,
+	sharedMemBytes := 0,
+	params: []rawptr = nil,
+	loc := #caller_location,
+) {
+	must(cuLaunchKernel(func, u32(gridX), u32(gridY), u32(gridZ), u32(blockX), u32(blockY), u32(blockZ), u32(sharedMemBytes), nil, raw_data(params), nil), loc)
 }
 
 make_cstring :: proc(size: uint) -> cstring {

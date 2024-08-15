@@ -1,14 +1,14 @@
 package util
 
 import "base:intrinsics"
-import "core:io"
-import "core:os"
-import "core:log"
 import "core:fmt"
-import "core:strings"
-import "core:slice"
+import "core:io"
+import "core:log"
 import "core:math"
+import "core:os"
 import "core:path/filepath"
+import "core:slice"
+import "core:strings"
 
 Cache_Dir :: "llm_odin"
 
@@ -16,7 +16,7 @@ user_formatters: map[typeid]fmt.User_Formatter
 
 @(init)
 init_formatters :: proc() {
-    fmt.set_user_formatters(&user_formatters)
+	fmt.set_user_formatters(&user_formatters)
 }
 
 // Location for cache data - e.g. /home/user/.cache on linux
@@ -44,7 +44,10 @@ user_cache_dir :: proc() -> (dir: string, ok: bool) {
 }
 
 // Create new sequence as 0..end or start..<end range.
-seq :: proc{seq_1, seq_2}
+seq :: proc {
+	seq_1,
+	seq_2,
+}
 
 seq_1 :: proc($T: typeid, end: int) -> []T where intrinsics.type_is_numeric(T) {
 	assert(end > 0)
@@ -57,7 +60,7 @@ seq_1 :: proc($T: typeid, end: int) -> []T where intrinsics.type_is_numeric(T) {
 
 seq_2 :: proc($T: typeid, start: int, end: int) -> []T where intrinsics.type_is_numeric(T) {
 	assert(end > start)
-	s := make([]T, end-start)
+	s := make([]T, end - start)
 	for v, i in start ..< end {
 		s[i] = T(v)
 	}
@@ -98,8 +101,8 @@ nearly_equal :: proc "contextless" (a, b: f32, epsilon: f32 = 1e-3, threshold: f
 		return true
 	}
 	diff := abs(a - b)
-	norm := min(abs(a)+abs(b), math.F32_MAX)
-	return diff < max(threshold, epsilon*norm)
+	norm := min(abs(a) + abs(b), math.F32_MAX)
+	return diff < max(threshold, epsilon * norm)
 }
 
 // read slice of data into input stream
@@ -123,8 +126,8 @@ comma_format :: proc(n: int) -> string {
 			fmt.sbprintf(b, "%d", n)
 			return
 		}
-		format(b, n/1000)
-		fmt.sbprintf(b, ",%03d", n%1000)
+		format(b, n / 1000)
+		fmt.sbprintf(b, ",%03d", n % 1000)
 	}
 
 	b := strings.builder_make()

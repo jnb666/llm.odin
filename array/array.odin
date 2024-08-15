@@ -1,11 +1,11 @@
 package array
 
 import "base:intrinsics"
+import "core:fmt"
+import "core:io"
+import "core:log"
 import "core:math"
 import "core:slice"
-import "core:io"
-import "core:fmt"
-import "core:log"
 
 import "../util"
 
@@ -22,35 +22,66 @@ Cuda :: struct {}
 
 // Array is a dynamically allocated multi-dimensional regular array. 
 Array :: struct($D, $T: typeid) where (D == CPU || D == Cuda) && (T == i32 || T == f32 || T == BF16) {
-	dptr: [^]T,
+	dptr:        [^]T,
 	using shape: Shape,
 }
 
-zeros :: proc{zeros_cpu, zeros_cuda}
+zeros :: proc {
+	zeros_cpu,
+	zeros_cuda,
+}
 
-delete :: proc{delete_cpu, delete_cuda,
-			   delete_string, delete_cstring, delete_dynamic_array, delete_slice, delete_map}
+delete :: proc {
+	delete_cpu,
+	delete_cuda,
+	delete_string,
+	delete_cstring,
+	delete_dynamic_array,
+	delete_slice,
+	delete_map,
+}
 
-zero :: proc{zero_cpu, zero_cuda}
+zero :: proc {
+	zero_cpu,
+	zero_cuda,
+}
 
-fill :: proc{fill_cpu, fill_cuda}
+fill :: proc {
+	fill_cpu,
+	fill_cuda,
+}
 
-copy :: proc{copy_array_cpu, copy_array_cuda,
-			 copy_array_to_slice_cpu, copy_slice_to_array_cpu,
-			 copy_array_to_slice_cuda, copy_slice_to_array_cuda,
-			 copy_slice, copy_from_string}
+copy :: proc {
+	copy_array_cpu,
+	copy_array_cuda,
+	copy_array_to_slice_cpu,
+	copy_slice_to_array_cpu,
+	copy_array_to_slice_cuda,
+	copy_slice_to_array_cuda,
+	copy_slice,
+	copy_from_string,
+}
 
-read :: proc{read_cpu, read_cuda}
+read :: proc {
+	read_cpu,
+	read_cuda,
+}
 
-write :: proc{write_cpu, write_cuda}
+write :: proc {
+	write_cpu,
+	write_cuda,
+}
 
-mean :: proc{mean_cpu, mean_cuda}
+mean :: proc {
+	mean_cpu,
+	mean_cuda,
+}
 
 ptr :: proc "contextless" (a: Array($D, $T), offset := 0) -> [^]T {
 	if a.dptr == nil {
 		return nil
 	}
-	return &a.dptr[a.offset+offset]
+	return &a.dptr[a.offset + offset]
 }
 
 is_nil :: proc "contextless" (a: Array($D, $T)) -> bool {
@@ -59,7 +90,7 @@ is_nil :: proc "contextless" (a: Array($D, $T)) -> bool {
 
 // Create a new array using a copy of the provided data. If move is set then calls delete(data)
 new :: proc($D, $T: typeid, dims: []int, data: []$V, move := false, loc := #caller_location) -> Array(D, T) {
-	a := zeros(D, T, dims, loc=loc)
+	a := zeros(D, T, dims, loc = loc)
 	copy(a, data)
 	if move {
 		delete(data)
@@ -69,7 +100,7 @@ new :: proc($D, $T: typeid, dims: []int, data: []$V, move := false, loc := #call
 
 // Allocate a new array with given dimensions and fill with zeros
 zeros_cpu :: proc($D, $T: typeid, dims: []int, loc := #caller_location) -> (a: Array(D, T)) where D == CPU {
-	a.shape = make_shape(dims, loc=loc)
+	a.shape = make_shape(dims, loc = loc)
 	a.dptr = raw_data(make([]T, a.size))
 	return a
 }
@@ -82,8 +113,8 @@ zeros_like :: proc(a: Array($D, $T)) -> Array(D, T) {
 
 // Return a view on the same data with new shape and optional relative offset
 view :: proc(a: Array($D, $T), dims: []int, offset := 0, loc := #caller_location) -> Array(D, T) {
-	assert(offset >= 0 && offset + math.prod(dims) <= a.size, "invalid size", loc) 
-	return {dptr = a.dptr, shape = make_shape(dims, a.offset+offset, loc=loc)}
+	assert(offset >= 0 && offset + math.prod(dims) <= a.size, "invalid size", loc)
+	return {dptr = a.dptr, shape = make_shape(dims, a.offset + offset, loc = loc)}
 }
 
 // Deallocate memory
@@ -95,13 +126,13 @@ delete_cpu :: proc(a: Array(CPU, $T)) {
 
 // Clear all elements to zero
 zero_cpu :: proc(a: Array(CPU, $T)) {
-	slice.zero(a.dptr[a.offset : a.offset+a.size])
+	slice.zero(a.dptr[a.offset:a.offset + a.size])
 }
 
 // Fill all elements with value
 fill_cpu :: proc(a: Array(CPU, $T), value: $V) where intrinsics.type_is_numeric(V) {
 	val := convert(T, value)
-	slice.fill(a.dptr[a.offset : a.offset+a.size], val)
+	slice.fill(a.dptr[a.offset:a.offset + a.size], val)
 }
 
 // Initialize values from function
@@ -116,16 +147,16 @@ initialize :: proc(a: Array($D, $T), fn: proc(ctx: rawptr) -> $T2, ctx: rawptr =
 
 // Copy array of same type
 copy_array_cpu :: proc(dst: Array(CPU, $T), src: Array(CPU, T)) {
-	copy(dst.dptr[dst.offset : dst.offset+dst.size], src.dptr[src.offset : src.offset+src.size])
+	copy(dst.dptr[dst.offset:dst.offset + dst.size], src.dptr[src.offset:src.offset + src.size])
 }
 
 // Copy data from array to slice
 copy_array_to_slice_cpu :: proc(dst: []$V, src: Array(CPU, $T)) {
 	when T == V {
-		copy(dst, src.dptr[src.offset : src.offset+src.size])
+		copy(dst, src.dptr[src.offset:src.offset + src.size])
 	} else {
 		for i in 0 ..< min(len(dst), src.size) {
-			dst[i] = convert(V, src.dptr[src.offset+i])
+			dst[i] = convert(V, src.dptr[src.offset + i])
 		}
 	}
 }
@@ -133,10 +164,10 @@ copy_array_to_slice_cpu :: proc(dst: []$V, src: Array(CPU, $T)) {
 // Copy data from slice to array
 copy_slice_to_array_cpu :: proc(dst: Array(CPU, $T), src: []$V) {
 	when T == V {
-		copy(dst.dptr[dst.offset: dst.offset+dst.size], src)
+		copy(dst.dptr[dst.offset:dst.offset + dst.size], src)
 	} else {
 		for i in 0 ..< min(len(src), dst.size) {
-			dst.dptr[dst.offset+i] = convert(T, src[i])
+			dst.dptr[dst.offset + i] = convert(T, src[i])
 		}
 	}
 }
@@ -182,10 +213,10 @@ mean_cpu :: proc(a: Array(CPU, $T)) -> f32 {
 
 // Shape contains the array dimensions. As a struct so can be stored on stack.
 Shape :: struct {
-	dims: [MAX_DIMS]int,
-	ndims: int,
+	dims:   [MAX_DIMS]int,
+	ndims:  int,
 	offset: int,
-	size: int,
+	size:   int,
 }
 
 make_shape :: proc(dims: []int, offset := 0, loc := #caller_location) -> (s: Shape) {
@@ -211,7 +242,7 @@ index :: proc(s: Shape, ix: ..int, loc := #caller_location) -> int {
 	assert(len(ix) <= s.ndims, "too many indices", loc)
 	pos := s.offset
 	stride := 1
-	for i := len(ix)-1; i >= 0; i -= 1 {
+	for i := len(ix) - 1; i >= 0; i -= 1 {
 		assert(ix[i] >= 0 && ix[i] < s.dims[i], "index out of range", loc)
 		pos += ix[i] * stride
 		stride *= int(s.dims[i])
@@ -250,8 +281,17 @@ convert_slice :: proc(dst: []$T, src: []$V) where intrinsics.type_is_numeric(T) 
 }
 
 // Check if arrays a and b have all elements with matching within relative + absolute error threshold
-compare :: proc(name: string, arr_a: Array($D1, $T1), arr_b: Array($D2, $T2), epsilon: f32 = 1e-3, 
-				threshold: f32 = 1e-6, max_print := 10, verbose := false, quiet := false, loc := #caller_location) -> bool {
+compare :: proc(
+	name: string,
+	arr_a: Array($D1, $T1),
+	arr_b: Array($D2, $T2),
+	epsilon: f32 = 1e-3,
+	threshold: f32 = 1e-6,
+	max_print := 10,
+	verbose := false,
+	quiet := false,
+	loc := #caller_location,
+) -> bool {
 	b1, b2: [32]u8
 
 	fmt_num :: proc(buf: []u8, x: f32) -> string {
@@ -259,7 +299,7 @@ compare :: proc(name: string, arr_a: Array($D1, $T1), arr_b: Array($D2, $T2), ep
 	}
 
 	if arr_a.dims != arr_b.dims {
-		log.errorf("%-20s: shape mismatch: a=%v b=%v", name, arr_a.shape, arr_b.shape, location=loc)
+		log.errorf("%-20s: shape mismatch: a=%v b=%v", name, arr_a.shape, arr_b.shape, location = loc)
 		return false
 	}
 	a := make([]f32, arr_a.size)
@@ -276,24 +316,24 @@ compare :: proc(name: string, arr_a: Array($D1, $T1), arr_b: Array($D2, $T2), ep
 		warned := false
 		if !util.nearly_equal(a[i], b[i], epsilon, threshold) {
 			if n_err < max_print {
-				log.warnf("%-20s: % 6d a=%s b=%s", name, i, fmt_num(b1[:], a[i]), fmt_num(b2[:], b[i]), location=loc)
+				log.warnf("%-20s: % 6d a=%s b=%s", name, i, fmt_num(b1[:], a[i]), fmt_num(b2[:], b[i]), location = loc)
 				warned = true
 			}
 			n_err += 1
 		}
 		if verbose && n_print + n_err < max_print && !warned {
-			log.infof("%-20s: % 6d a=%s b=%s", name, i, fmt_num(b1[:], a[i]), fmt_num(b2[:], b[i]), location=loc)
+			log.infof("%-20s: % 6d a=%s b=%s", name, i, fmt_num(b1[:], a[i]), fmt_num(b2[:], b[i]), location = loc)
 			n_print += 1
 		}
 	}
 	if n_err > 0 {
-		log.errorf("%-20s: %d / %d values outside threshold  max_diff=%.2g", name, n_err, len(a), max_diff, location=loc)
+		log.errorf("%-20s: %d / %d values outside threshold  max_diff=%.2g", name, n_err, len(a), max_diff, location = loc)
 		return false
 	}
 	if quiet {
-		log.debugf("%-20s: all ok  max_diff=%.2g", name, max_diff, location=loc)
+		log.debugf("%-20s: all ok  max_diff=%.2g", name, max_diff, location = loc)
 	} else {
-		log.infof("%-20s: all ok  max_diff=%.2g", name, max_diff, location=loc)
+		log.infof("%-20s: all ok  max_diff=%.2g", name, max_diff, location = loc)
 	}
 	return true
 }

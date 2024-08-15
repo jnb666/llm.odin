@@ -10,16 +10,16 @@ foreign import "system:webview"
 Webview :: distinct rawptr
 
 Webview_Version :: struct {
-    major : u32,
-    minor : u32,
-    patch : u32,
+	major: u32,
+	minor: u32,
+	patch: u32,
 }
 
 Webview_Version_Info :: struct {
-    version: Webview_Version,
-    version_number: [32]u8,
-    pre_release: [48]u8,
-    build_metadata: [48]u8,
+	version:        Webview_Version,
+	version_number: [32]u8,
+	pre_release:    [48]u8,
+	build_metadata: [48]u8,
 }
 
 Webview_Hint :: enum i32 {
@@ -31,16 +31,16 @@ Webview_Hint :: enum i32 {
 
 Webview_Error :: enum i32 {
 	MISSING_DEPENDENCY = -5,
-	CANCELED = -4,
-	INVALID_STATE = -3,
-	INVALID_ARGUMENT = -2,
-	UNSPECIFIED = -1,
-	OK = 0,
-	DUPLICATE = 1,
-	NOT_FOUND = 2,
+	CANCELED           = -4,
+	INVALID_STATE      = -3,
+	INVALID_ARGUMENT   = -2,
+	UNSPECIFIED        = -1,
+	OK                 = 0,
+	DUPLICATE          = 1,
+	NOT_FOUND          = 2,
 }
 
-@(default_calling_convention="c")
+@(default_calling_convention = "c")
 foreign webview {
 	webview_create :: proc(debug: i32, window: rawptr) -> Webview ---
 	webview_destroy :: proc(w: Webview) -> Webview_Error ---
@@ -54,7 +54,7 @@ foreign webview {
 	webview_set_html :: proc(w: Webview, html: cstring) -> Webview_Error ---
 	webview_init :: proc(w: Webview, js: cstring) -> Webview_Error ---
 	webview_eval :: proc(w: Webview, js: cstring) -> Webview_Error ---
-	webview_bind :: proc(w: Webview, name: cstring, fn : #type proc(seq, req: cstring, arg: rawptr), arg: rawptr) -> Webview_Error ---
+	webview_bind :: proc(w: Webview, name: cstring, fn: #type proc(seq, req: cstring, arg: rawptr), arg: rawptr) -> Webview_Error ---
 	webview_unbind :: proc(w: Webview, name: cstring) -> Webview_Error ---
 	webview_ret :: proc(w: Webview, seq: cstring, status: i32, result: cstring) -> Webview_Error ---
 	webview_version :: proc() -> ^Webview_Version_Info ---
@@ -62,6 +62,6 @@ foreign webview {
 
 must :: proc(e: Webview_Error, loc := #caller_location) {
 	if int(e) < 0 {
-		log.panicf("webview error: %v\n", e, location=loc)
+		log.panicf("webview error: %v\n", e, location = loc)
 	}
 }

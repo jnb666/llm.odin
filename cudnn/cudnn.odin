@@ -1,8 +1,8 @@
 package cudnn
 
+import "../cuda"
 import "core:log"
 import "core:strings"
-import "../cuda"
 
 foreign import "system:cudnn"
 
@@ -11,52 +11,50 @@ BackendDescriptor :: distinct rawptr
 RuntimeTag :: distinct rawptr
 Fraction :: FractionStruct
 
-@(default_calling_convention="c")
+@(default_calling_convention = "c")
 foreign cudnn {
 
-	@(link_name="cudnnGetVersion")
+	@(link_name = "cudnnGetVersion")
 	GetVersion :: proc() -> uint ---
 
-	@(link_name="cudnnGetErrorString")
-	GetErrorString :: proc(status : Status) -> cstring ---
+	@(link_name = "cudnnGetErrorString")
+	GetErrorString :: proc(status: Status) -> cstring ---
 
-	@(link_name="cudnnGetLastErrorString")
-	GetLastErrorString :: proc(message : cstring, max_size : uint) ---
+	@(link_name = "cudnnGetLastErrorString")
+	GetLastErrorString :: proc(message: cstring, max_size: uint) ---
 
-	@(link_name="cudnnQueryRuntimeError")
-	QueryRuntimeError :: proc(handle : Handle, rstatus : ^Status, mode : ErrQueryMode, tag : ^RuntimeTag) -> Status ---
+	@(link_name = "cudnnQueryRuntimeError")
+	QueryRuntimeError :: proc(handle: Handle, rstatus: ^Status, mode: ErrQueryMode, tag: ^RuntimeTag) -> Status ---
 
-	@(link_name="cudnnCreate")
-	Create :: proc(handle : ^Handle) -> Status ---
+	@(link_name = "cudnnCreate")
+	Create :: proc(handle: ^Handle) -> Status ---
 
-	@(link_name="cudnnDestroy")
-	Destroy :: proc(handle : Handle) -> Status ---
+	@(link_name = "cudnnDestroy")
+	Destroy :: proc(handle: Handle) -> Status ---
 
-	@(link_name="cudnnSetStream")
-	SetStream :: proc(handle : Handle, streamId : cuda.Stream) -> Status ---
+	@(link_name = "cudnnSetStream")
+	SetStream :: proc(handle: Handle, streamId: cuda.Stream) -> Status ---
 
-	@(link_name="cudnnGetStream")
-	GetStream :: proc(handle : Handle, streamId : ^cuda.Stream) -> Status ---
+	@(link_name = "cudnnGetStream")
+	GetStream :: proc(handle: Handle, streamId: ^cuda.Stream) -> Status ---
 
-	@(link_name="cudnnBackendCreateDescriptor")
-	BackendCreateDescriptor :: proc(descriptorType : BackendDescriptorType, descriptor : ^BackendDescriptor) -> Status ---
+	@(link_name = "cudnnBackendCreateDescriptor")
+	BackendCreateDescriptor :: proc(descriptorType: BackendDescriptorType, descriptor: ^BackendDescriptor) -> Status ---
 
-	@(link_name="cudnnBackendDestroyDescriptor")
-	BackendDestroyDescriptor :: proc(descriptor : BackendDescriptor) -> Status ---
+	@(link_name = "cudnnBackendDestroyDescriptor")
+	BackendDestroyDescriptor :: proc(descriptor: BackendDescriptor) -> Status ---
 
-	@(link_name="cudnnBackendFinalize")
-	BackendFinalize :: proc(descriptor : BackendDescriptor) -> Status ---
+	@(link_name = "cudnnBackendFinalize")
+	BackendFinalize :: proc(descriptor: BackendDescriptor) -> Status ---
 
-	@(link_name="cudnnBackendSetAttribute")
-	BackendSetAttribute :: proc(descriptor : BackendDescriptor, attributeName : BackendAttributeName, attributeType : BackendAttributeType, 
-		elementCount : i64, arrayOfElements : rawptr) -> Status ---
+	@(link_name = "cudnnBackendSetAttribute")
+	BackendSetAttribute :: proc(descriptor: BackendDescriptor, attributeName: BackendAttributeName, attributeType: BackendAttributeType, elementCount: i64, arrayOfElements: rawptr) -> Status ---
 
-	@(link_name="cudnnBackendGetAttribute")
-	BackendGetAttribute :: proc(descriptor : BackendDescriptor, attributeName : BackendAttributeName, attributeType : BackendAttributeType, 
-		requestedElementCount : i64, elementCount : ^i64, arrayOfElements : rawptr) -> Status ---
+	@(link_name = "cudnnBackendGetAttribute")
+	BackendGetAttribute :: proc(descriptor: BackendDescriptor, attributeName: BackendAttributeName, attributeType: BackendAttributeType, requestedElementCount: i64, elementCount: ^i64, arrayOfElements: rawptr) -> Status ---
 
-	@(link_name="cudnnBackendExecute")
-	BackendExecute :: proc(handle : Handle, executionPlan : BackendDescriptor, variantPack : BackendDescriptor) -> Status ---
+	@(link_name = "cudnnBackendExecute")
+	BackendExecute :: proc(handle: Handle, executionPlan: BackendDescriptor, variantPack: BackendDescriptor) -> Status ---
 }
 
 // Register cudnn handle in cuda user context
@@ -80,14 +78,14 @@ must :: proc(rc: Status, loc := #caller_location) {
 }
 
 query_runtime_error :: proc(loc := #caller_location) -> Status {
-	handle := cast(Handle)cuda.get_handle("cudnn", loc=loc)
+	handle := cast(Handle)cuda.get_handle("cudnn", loc = loc)
 	rc: Status
 	must(QueryRuntimeError(handle, &rc, .BLOCKING, nil), loc)
 	return rc
 }
 
 set :: proc(d: BackendDescriptor, name: BackendAttributeName, type: BackendAttributeType, ptr: rawptr, count: int = 1, loc := #caller_location) {
-	 must(BackendSetAttribute(d, name, type, i64(count), ptr), loc)
+	must(BackendSetAttribute(d, name, type, i64(count), ptr), loc)
 }
 
 get :: proc(d: BackendDescriptor, name: BackendAttributeName, type: BackendAttributeType, req_count: int, elements: rawptr) -> int {
@@ -99,7 +97,7 @@ get :: proc(d: BackendDescriptor, name: BackendAttributeName, type: BackendAttri
 make_descriptor :: proc(type: BackendDescriptorType) -> BackendDescriptor {
 	d: BackendDescriptor
 	must(BackendCreateDescriptor(type, &d))
-	return d 
+	return d
 }
 
 destroy :: proc(desc: ..BackendDescriptor) {
@@ -111,8 +109,15 @@ destroy :: proc(desc: ..BackendDescriptor) {
 }
 
 // generate tensor descriptor. if strides is nil then allocate using packed layout
-tensor_descriptor :: proc(id: u64, dims: []int, strides: []int = nil, dtype: DataType = .FLOAT, virtual := false, by_value := false, 
-							loc := #caller_location) -> BackendDescriptor {
+tensor_descriptor :: proc(
+	id: u64,
+	dims: []int,
+	strides: []int = nil,
+	dtype: DataType = .FLOAT,
+	virtual := false,
+	by_value := false,
+	loc := #caller_location,
+) -> BackendDescriptor {
 	id, dtype := id, dtype
 	alignment := 16
 	d := make_descriptor(.TENSOR_DESCRIPTOR)
@@ -134,7 +139,7 @@ tensor_descriptor :: proc(id: u64, dims: []int, strides: []int = nil, dtype: Dat
 		stride := make([]int, len(dims))
 		defer delete(stride)
 		n := 1
-		for i := len(dims)-1; i >= 0; i -= 1 {
+		for i := len(dims) - 1; i >= 0; i -= 1 {
 			stride[i] = n
 			n *= dims[i]
 		}
@@ -149,7 +154,7 @@ finalize :: proc(d: BackendDescriptor, loc := #caller_location) -> BackendDescri
 }
 
 make_graph :: proc(ops: ..BackendDescriptor, loc := #caller_location) -> BackendDescriptor {
-	handle := cast(Handle)cuda.get_handle("cudnn", loc=loc)
+	handle := cast(Handle)cuda.get_handle("cudnn", loc = loc)
 	d := make_descriptor(.OPERATIONGRAPH_DESCRIPTOR)
 	set(d, .OPERATIONGRAPH_HANDLE, .HANDLE, &handle)
 	set(d, .OPERATIONGRAPH_OPS, .BACKEND_DESCRIPTOR, raw_data(ops), len(ops))
@@ -172,7 +177,7 @@ get_configs_from_heuristic :: proc(graph: BackendDescriptor, mode: BackendHeurMo
 		configs[i] = make_descriptor(.ENGINECFG_DESCRIPTOR)
 	}
 	count := get(d, .ENGINEHEUR_RESULTS, .BACKEND_DESCRIPTOR, max_count, raw_data(configs))
-	log.debugf("found %d / %d candidate configs using %s", count, max_count, mode, location=loc)
+	log.debugf("found %d / %d candidate configs using %s", count, max_count, mode, location = loc)
 	if count == 0 {
 		delete(configs)
 		return nil
@@ -182,8 +187,8 @@ get_configs_from_heuristic :: proc(graph: BackendDescriptor, mode: BackendHeurMo
 
 // get first supported execution plan from heuristics
 get_plan :: proc(graph: BackendDescriptor, mode: BackendHeurMode = .HEUR_MODE_A, loc := #caller_location) -> (plan: BackendDescriptor, err: Status) {
-	handle := cast(Handle)cuda.get_handle("cudnn", loc=loc)
-	configs := get_configs_from_heuristic(graph, mode, loc=loc)
+	handle := cast(Handle)cuda.get_handle("cudnn", loc = loc)
+	configs := get_configs_from_heuristic(graph, mode, loc = loc)
 	if len(configs) == 0 {
 		return nil, .NOT_SUPPORTED
 	}
@@ -214,7 +219,7 @@ workspace_size :: proc(plan: BackendDescriptor) -> int {
 // execute plan with given tensor inputs
 execute :: proc(plan: BackendDescriptor, ids: []u64, arrays: []rawptr, loc := #caller_location) {
 	assert(len(ids) == len(arrays), "invalid input params", loc)
-	handle := cast(Handle)cuda.get_handle("cudnn", loc=loc)
+	handle := cast(Handle)cuda.get_handle("cudnn", loc = loc)
 
 	vars := make_descriptor(.VARIANT_PACK_DESCRIPTOR)
 	defer destroy(vars)
@@ -226,7 +231,7 @@ execute :: proc(plan: BackendDescriptor, ids: []u64, arrays: []rawptr, loc := #c
 		set(vars, .VARIANT_PACK_WORKSPACE, .VOID_PTR, &wspace)
 	}
 	finalize(vars, loc)
-	
+
 	must(BackendExecute(handle, plan, vars))
 
 	if wspace != nil {
@@ -240,14 +245,17 @@ cache_plan :: proc(id: string, plan: BackendDescriptor, loc := #caller_location)
 		BackendDestroyDescriptor(cast(BackendDescriptor)p)
 		delete(key)
 	}
-	assert (context.user_ptr != nil, "cuda user context not set", loc)
+	assert(context.user_ptr != nil, "cuda user context not set", loc)
 	ctx := cast(^cuda.UserContext)context.user_ptr
-	ctx.cache[strings.clone(id)] = cuda.Handle{ptr=plan, destroy=destroy_entry}
+	ctx.cache[strings.clone(id)] = cuda.Handle {
+		ptr     = plan,
+		destroy = destroy_entry,
+	}
 }
 
 // lookup previously saved plan
 plan_from_cache :: proc(id: string, loc := #caller_location) -> (BackendDescriptor, bool) {
-	assert (context.user_ptr != nil, "cuda user context not set", loc)
+	assert(context.user_ptr != nil, "cuda user context not set", loc)
 	ctx := cast(^cuda.UserContext)context.user_ptr
 	if h, ok := ctx.cache[id]; ok {
 		return cast(BackendDescriptor)h.ptr, true
@@ -268,7 +276,7 @@ pointwise_descriptor :: proc(mode: PointwiseMode, prec: DataType, axis := -1) ->
 }
 
 // y = op(x)
-unary_op :: proc(mode :PointwiseMode, x, y: BackendDescriptor, axis := -1, type: DataType = .FLOAT) -> BackendDescriptor {
+unary_op :: proc(mode: PointwiseMode, x, y: BackendDescriptor, axis := -1, type: DataType = .FLOAT) -> BackendDescriptor {
 	x, y := x, y
 	typ := pointwise_descriptor(mode, type, axis)
 	defer destroy(typ)
@@ -280,7 +288,7 @@ unary_op :: proc(mode :PointwiseMode, x, y: BackendDescriptor, axis := -1, type:
 }
 
 // y = x op b
-binary_op ::  proc(mode :PointwiseMode, x, b, y: BackendDescriptor, mask: BackendDescriptor = nil, type: DataType = .FLOAT) -> BackendDescriptor {
+binary_op :: proc(mode: PointwiseMode, x, b, y: BackendDescriptor, mask: BackendDescriptor = nil, type: DataType = .FLOAT) -> BackendDescriptor {
 	x, b, y := x, b, y
 	typ := pointwise_descriptor(mode, type)
 	defer destroy(typ)
@@ -298,7 +306,7 @@ binary_op ::  proc(mode :PointwiseMode, x, b, y: BackendDescriptor, mask: Backen
 }
 
 // y = reduce_op(x)
-reduce_op :: proc(mode :ReduceTensorOp, x, y: BackendDescriptor, type: DataType = .FLOAT) -> BackendDescriptor {
+reduce_op :: proc(mode: ReduceTensorOp, x, y: BackendDescriptor, type: DataType = .FLOAT) -> BackendDescriptor {
 	mode, type := mode, type
 	typ := make_descriptor(.REDUCTION_DESCRIPTOR)
 	set(typ, .REDUCTION_OPERATOR, .REDUCTION_OPERATOR_TYPE, &mode)

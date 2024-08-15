@@ -2,32 +2,32 @@ package cuda
 
 import "core:strings"
 
-@(extra_linker_flags="-L/usr/local/cuda/lib64")
+@(extra_linker_flags = "-L/usr/local/cuda/lib64")
 foreign import nvrtc "system:nvrtc"
 
 Program :: distinct rawptr
 
 NvrtcResult :: enum i32 {
-	SUCCESS = 0,
-	OUT_OF_MEMORY = 1,
-	PROGRAM_CREATION_FAILURE = 2,
-	INVALID_INPUT = 3,
-	INVALID_PROGRAM = 4,
-	INVALID_OPTION = 5,
-	COMPILATION = 6,
-	BUILTIN_OPERATION_FAILURE = 7,
+	SUCCESS                               = 0,
+	OUT_OF_MEMORY                         = 1,
+	PROGRAM_CREATION_FAILURE              = 2,
+	INVALID_INPUT                         = 3,
+	INVALID_PROGRAM                       = 4,
+	INVALID_OPTION                        = 5,
+	COMPILATION                           = 6,
+	BUILTIN_OPERATION_FAILURE             = 7,
 	NO_NAME_EXPRESSIONS_AFTER_COMPILATION = 8,
-	NO_LOWERED_NAMES_BEFORE_COMPILATION = 9,
-	NAME_EXPRESSION_NOT_VALID = 10,
-	INTERNAL_ERROR = 11,
-	TIME_FILE_WRITE_FAILED = 12
+	NO_LOWERED_NAMES_BEFORE_COMPILATION   = 9,
+	NAME_EXPRESSION_NOT_VALID             = 10,
+	INTERNAL_ERROR                        = 11,
+	TIME_FILE_WRITE_FAILED                = 12,
 }
 
 
-@(default_calling_convention="c", private)
+@(default_calling_convention = "c", private)
 foreign nvrtc {
 	nvrtcGetErrorString :: proc(rc: NvrtcResult) -> cstring ---
-	nvrtcCreateProgram :: proc(prog: ^Program, src, name: cstring, numHeaders: i32, headers, includeNames: cstring)  -> NvrtcResult ---
+	nvrtcCreateProgram :: proc(prog: ^Program, src, name: cstring, numHeaders: i32, headers, includeNames: cstring) -> NvrtcResult ---
 	nvrtcDestroyProgram :: proc(prog: ^Program) -> NvrtcResult ---
 	nvrtcCompileProgram :: proc(prog: Program, numOptions: i32, options: ^cstring) -> NvrtcResult ---
 	nvrtcGetProgramLogSize :: proc(prog: Program, logSize: ^uint) -> NvrtcResult ---
@@ -80,4 +80,3 @@ compile_to_ptx :: proc(src: string, name: cstring, opts: ..string) -> (ptx: stri
 	must(nvrtcGetPTX(prog, cptx))
 	return string(cptx), .SUCCESS
 }
-

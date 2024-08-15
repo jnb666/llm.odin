@@ -1,15 +1,15 @@
 package main
 
-import "core:fmt"
-import "core:os"
-import "core:sys/linux"
-import "core:log"
-import "core:mem"
-import "core:strings"
-import "core:time"
-import "core:path/filepath"
 import "core:encoding/json"
 import "core:flags"
+import "core:fmt"
+import "core:log"
+import "core:mem"
+import "core:os"
+import "core:path/filepath"
+import "core:strings"
+import "core:sys/linux"
+import "core:time"
 
 import "../back"
 import "array"
@@ -26,21 +26,21 @@ stderr := os.stream_from_handle(os.stderr)
 Base_Options :: struct {
 	debug: bool,
 	track: bool,
-	cuda: bool,
+	cuda:  bool,
 }
 
-Command :: struct{
-	func: proc([]string),
+Command :: struct {
+	func: proc(_: []string),
 	name: string,
 	desc: string,
 }
 
 commands := []Command {
-	{prepare_main, 	"prepare", 	"download sample datasets and encode tokens"},
-	{train_main, 	"train", 	"general training handler: train the model on a training data and evaluate the output"},
+	{prepare_main, "prepare", "download sample datasets and encode tokens"},
+	{train_main, "train", "general training handler: train the model on a training data and evaluate the output"},
 	{generate_main, "generate", "generate text by sampling the model output logits"},
-	{test_main, 	"test", 	"run training session to compare model output with saved pytorch state"},
-	{help_main, 	"help", 	"info on available commands"},
+	{test_main, "test", "run training session to compare model output with saved pytorch state"},
+	{help_main, "help", "info on available commands"},
 }
 
 main :: proc() {
@@ -59,12 +59,12 @@ main :: proc() {
 			cmd.func(os.args[2:])
 			return
 		}
-	}	
+	}
 	help_main({})
 }
 
 // run fn with common context settings
-run :: proc(fn: proc(rawptr), opt_ptr: rawptr) {
+run :: proc(fn: proc(_: rawptr), opt_ptr: rawptr) {
 	c := context
 	opt := cast(^Base_Options)opt_ptr
 	if opt.debug {
@@ -77,7 +77,7 @@ run :: proc(fn: proc(rawptr), opt_ptr: rawptr) {
 		c.allocator = mem.tracking_allocator(&track)
 	}
 	if opt.cuda {
-		c.user_ptr = nn.init_cuda(verbose=true)
+		c.user_ptr = nn.init_cuda(verbose = true)
 	}
 	context = c
 	fn(opt)
@@ -190,7 +190,7 @@ http_get :: proc(url, file: string) -> (status: u32, err: os.Error) {
 		if got_pid < 0 || got_pid != pid {
 			return 0, .Unsupported
 		}
-		status = child_status/256
+		status = child_status / 256
 	}
 	return
 }

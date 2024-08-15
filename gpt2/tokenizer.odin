@@ -1,28 +1,28 @@
 package gpt2
 
 import "core:bytes"
+import "core:encoding/json"
 import "core:log"
 import "core:os"
 import "core:slice"
 import "core:strings"
-import "core:encoding/json"
 import "core:unicode"
 import "core:unicode/utf8"
 
 import "../util"
 
-End_Token ::  "<|endoftext|>"
+End_Token :: "<|endoftext|>"
 
 End_Token_ID :: 50256
 
 // Tokenizer to convert between text and integer tokens using GPT-2 byte pair encoding
 Tokenizer :: struct {
-	byte_enc: [256]rune,
-	byte_dec: [512]u8,
-	encoder:  map[string]u16,
-	decoder:  map[u16]string,
+	byte_enc:  [256]rune,
+	byte_dec:  [512]u8,
+	encoder:   map[string]u16,
+	decoder:   map[u16]string,
 	bpe_ranks: map[Pair]int,
-	cache: map[string][]u16,
+	cache:     map[string][]u16,
 }
 
 Pair :: [2]string
@@ -46,7 +46,7 @@ new_tokenizer :: proc() -> ^Tokenizer {
 		}
 		ix := strings.index_byte(line, ' ')
 		assert(ix >= 1, "error parsing vocab.bpe")
-		append(&pairs, Pair{line[:ix], line[ix+1:]})
+		append(&pairs, Pair{line[:ix], line[ix + 1:]})
 	}
 	defer delete(pairs)
 	return new_tokenizer_with_config(vocab, pairs[:])
@@ -150,7 +150,7 @@ encode_word :: proc(t: ^Tokenizer, text: string, tokens: ^[dynamic]u16) {
 	//log.debug("lookup", item)
 	word := split_runes(item)
 	defer delete(word)
-	
+
 	pairs: [dynamic]Pair
 	defer delete(pairs)
 	get_pairs(word[:], &pairs)
@@ -158,11 +158,11 @@ encode_word :: proc(t: ^Tokenizer, text: string, tokens: ^[dynamic]u16) {
 		append(tokens, ..encode_item(t, item, word[:]))
 		return
 	}
-	
+
 	defer free_all(context.temp_allocator)
 	new_word: [dynamic]string
 	defer delete(new_word)
-	
+
 	for {
 		first, second, found := min_rank(t, pairs[:])
 		if !found {
@@ -178,7 +178,7 @@ encode_word :: proc(t: ^Tokenizer, text: string, tokens: ^[dynamic]u16) {
 				append(&new_word, ..word[i:])
 				break
 			}
-			if word[i] == first && i < len(word)-1 && word[i+1] == second {
+			if word[i] == first && i < len(word) - 1 && word[i + 1] == second {
 				append(&new_word, strings.concatenate({first, second}, context.temp_allocator))
 				i += 2
 			} else {
@@ -292,26 +292,26 @@ encode_bytes :: proc(t: ^Tokenizer, word: string) -> string {
 split_words :: proc(runes: []rune, matches: ^[dynamic]int) {
 	pos := 0
 	clear(matches)
-	match_funcs := []proc(rune)->bool{ unicode.is_letter, unicode.is_number, not_space_letter_or_number	}
-main_loop:
-	for pos < len(runes) {
+	match_funcs := []proc(_: rune) -> bool{unicode.is_letter, unicode.is_number, not_space_letter_or_number}
+
+	main_loop: for pos < len(runes) {
 		r := runes[pos]
-		if r == '\'' && pos < len(runes)-1 {
-			if n := match_quote_suffix(runes[pos+1:]); n > 0 {
+		if r == '\'' && pos < len(runes) - 1 {
+			if n := match_quote_suffix(runes[pos + 1:]); n > 0 {
 				pos += n + 1
 				append(matches, pos)
 				continue main_loop
 			}
 		}
 		for fn in match_funcs {
-			if n, ok := count_rune_is(runes[pos:], fn, leading_space=true); ok {
+			if n, ok := count_rune_is(runes[pos:], fn, leading_space = true); ok {
 				pos += n
 				append(matches, pos)
 				continue main_loop
 			}
 		}
 		if n, ok := count_rune_is(runes[pos:], is_ascii_space); ok {
-			pos += n 
+			pos += n
 			append(matches, pos)
 		} else {
 			pos += 1
@@ -337,7 +337,7 @@ not_space_letter_or_number :: proc(r: rune) -> bool {
 
 // returns no. of runes matched + flag indicating any not including leading space
 @(private)
-count_rune_is :: proc(runes: []rune, fn: proc(rune) -> bool, leading_space := false) -> (int, bool) {
+count_rune_is :: proc(runes: []rune, fn: proc(_: rune) -> bool, leading_space := false) -> (int, bool) {
 	n := 0
 	ok := false
 	for r, i in runes {

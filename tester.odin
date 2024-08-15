@@ -5,41 +5,41 @@ import "core:log"
 import "core:os"
 import "core:time"
 
+import "array"
 import "gpt2"
 import "nn"
-import "array"
 import "util"
 
-Test_Options :: struct{
-	debug: bool `usage:"enable debug logging"`,
-	track: bool `usage:"use tracking allocator to find memory leaks"`,
-	cuda: bool `usage:"use Cuda acceleration"`,
-	model: string `usage:"model checkpoint file"`,
-	debug_state: string `usage:"debug state checkpoint file"`,	
-	loss_file: string `usage:"json file with saved mean losses"`,
-	verbose: bool `usage:"show verbose output"`,
-	quiet: bool `usage:"suppress differences if ok"`,
-	steps: int `usage:"number of test steps"`,
-	recompute: bool `usage:"recompute Gelu activations to save memory"`
+Test_Options :: struct {
+	debug:       bool `usage:"enable debug logging"`,
+	track:       bool `usage:"use tracking allocator to find memory leaks"`,
+	cuda:        bool `usage:"use Cuda acceleration"`,
+	model:       string `usage:"model checkpoint file"`,
+	debug_state: string `usage:"debug state checkpoint file"`,
+	loss_file:   string `usage:"json file with saved mean losses"`,
+	verbose:     bool `usage:"show verbose output"`,
+	quiet:       bool `usage:"suppress differences if ok"`,
+	steps:       int `usage:"number of test steps"`,
+	recompute:   bool `usage:"recompute Gelu activations to save memory"`,
 }
 
-Debug_State :: struct{
+Debug_State :: struct {
 	batch_size: int,
-	seq_len: int,
-	x, y: Array(CPU, i32),
-	logits: Array(CPU, f32),
-	loss: f32,
-	grads: ^gpt2.Model(CPU, f32),
-	losses: []f32,
+	seq_len:    int,
+	x, y:       Array(CPU, i32),
+	logits:     Array(CPU, f32),
+	loss:       f32,
+	grads:      ^gpt2.Model(CPU, f32),
+	losses:     []f32,
 }
 
 // run test training session to compare model outputs with saved pytorch reference
 test_main :: proc(args: []string) {
-	opt := Test_Options{
-		model 		= "gpt2_124M.bin",
+	opt := Test_Options {
+		model       = "gpt2_124M.bin",
 		debug_state = "gpt2_124M_debug_state.bin",
 		loss_file   = "gpt2_124M_losses.json",
-		steps 		= 10,
+		steps       = 10,
 	}
 	parse_args(&opt, "llm test", args)
 	run(test_run, &opt)
@@ -78,7 +78,7 @@ test_start :: proc($Device, $Type: typeid, opt: ^Test_Options) {
 		nn.write_summary(stdout, &model.layer)
 	}
 
-	adamw := nn.new_optimizer(&model.layer, learning_rate=1e-4, weight_decay=0.01, gradient_clip=1)
+	adamw := nn.new_optimizer(&model.layer, learning_rate = 1e-4, weight_decay = 0.01, gradient_clip = 1)
 	log.infof("%.4v", adamw.config)
 	defer nn.delete_optimizer(adamw)
 
@@ -90,7 +90,7 @@ test_start :: proc($Device, $Type: typeid, opt: ^Test_Options) {
 	} else {
 		input, output := state.x, state.y
 	}
-	
+
 	when Device == CPU {
 		epsilon, threshold: f32 = 0.12, 0.005
 		check_loss_steps := len(state.losses)
@@ -106,7 +106,7 @@ test_start :: proc($Device, $Type: typeid, opt: ^Test_Options) {
 		start := time.now()
 		gpt2.forward(model, input)
 		if step == 1 {
-			if !array.compare("logits", model.act.logits, state.logits, epsilon=epsilon, threshold=threshold, verbose=opt.verbose, quiet=opt.quiet) {
+			if !array.compare("logits", model.act.logits, state.logits, epsilon = epsilon, threshold = threshold, verbose = opt.verbose, quiet = opt.quiet) {
 				all_ok = false
 			}
 		}
@@ -118,13 +118,12 @@ test_start :: proc($Device, $Type: typeid, opt: ^Test_Options) {
 		gpt2.backward(model, input)
 		elapsed_step := round_ms(time.since(start))
 		if step == 1 {
-			compare_params(&model.layer, &state.grads.layer, epsilon, threshold, &all_ok, verbose=opt.verbose, quiet=opt.quiet)
+			compare_params(&model.layer, &state.grads.layer, epsilon, threshold, &all_ok, verbose = opt.verbose, quiet = opt.quiet)
 		}
 		grad_norm := nn.optimizer_step(adamw, model)
 		elapsed := round_ms(time.since(start))
-		exp_loss := step <= len(state.losses) ? state.losses[step-1] : -1
-		log.infof("step % 2d : norm = % 6.2f  loss = %.4f - expect %.4f  elapsed %v / %v", 
-			step, grad_norm, loss, exp_loss, elapsed_step, elapsed)
+		exp_loss := step <= len(state.losses) ? state.losses[step - 1] : -1
+		log.infof("step % 2d : norm = % 6.2f  loss = %.4f - expect %.4f  elapsed %v / %v", step, grad_norm, loss, exp_loss, elapsed_step, elapsed)
 		if step <= check_loss_steps && !util.nearly_equal(loss, exp_loss, epsilon, threshold) {
 			log.errorf("loss not matching expected")
 			all_ok = false
@@ -142,11 +141,11 @@ compare_params :: proc(m1: ^nn.Layer($D1, $T1), m2: ^nn.Layer($D2, $T2), epsilon
 	assert(m1.name == m2.name && len(m1.params) == len(m2.params))
 	for i in 0 ..< len(m1.params) {
 		name := fmt.bprintf(buf[:], "%s.p[%d]", m1.name, i)
-		if !array.compare(name, m1.params[i].grad, m2.params[i].arr, epsilon=epsilon, threshold=threshold, verbose=verbose, quiet=quiet) {
+		if !array.compare(name, m1.params[i].grad, m2.params[i].arr, epsilon = epsilon, threshold = threshold, verbose = verbose, quiet = quiet) {
 			ok^ = false
 		}
 	}
-	for i := len(m1.layers)-1; i >= 0; i -= 1 {
+	for i := len(m1.layers) - 1; i >= 0; i -= 1 {
 		compare_params(m1.layers[i], m2.layers[i], epsilon, threshold, ok, verbose, quiet)
 	}
 }
@@ -168,7 +167,7 @@ load_debug_state :: proc(file, loss_file: string, cfg: gpt2.Config) -> (s: ^Debu
 	s = new(Debug_State)
 	s.batch_size = int(header[2])
 	s.seq_len = int(header[3])
-	
+
 	s.x = array.zeros(CPU, i32, {s.batch_size, s.seq_len})
 	s.y = array.zeros(CPU, i32, {s.batch_size, s.seq_len})
 	array.read(i32, r, s.x) or_return
@@ -177,9 +176,9 @@ load_debug_state :: proc(file, loss_file: string, cfg: gpt2.Config) -> (s: ^Debu
 	s.logits = array.zeros(CPU, f32, {s.batch_size, s.seq_len, cfg.vocab_padded})
 	logits := make([]f32, cfg.vocab_size)
 	defer delete(logits)
-	for i in 0 ..< s.batch_size*s.seq_len {
+	for i in 0 ..< s.batch_size * s.seq_len {
 		util.read_slice(r, logits) or_return
-		array.copy(array.view(s.logits, {cfg.vocab_size}, offset=i*cfg.vocab_padded), logits)
+		array.copy(array.view(s.logits, {cfg.vocab_size}, offset = i * cfg.vocab_padded), logits)
 	}
 	loss: [1]f32
 	util.read_slice(r, loss[:]) or_return

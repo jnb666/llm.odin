@@ -5,7 +5,7 @@ import "core:fmt"
 import "core:io"
 import "core:slice"
 
-import _ "../util"
+import "../util"
 
 // Parameters for array format summarization
 Edgeitems: int = 5
@@ -15,14 +15,14 @@ Default_Precision: int = 3
 
 @(init)
 init_formatters :: proc() {
-    fmt.register_user_formatter(BF16, fmt_bfloat16)
-    fmt.register_user_formatter(Shape, fmt_shape)
-    fmt.register_user_formatter(Array(CPU, i32), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool { return cpu_array_fmt(i32, fi, arg, verb) })
-    fmt.register_user_formatter(Array(CPU, f32), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool { return cpu_array_fmt(f32, fi, arg, verb) })
-    fmt.register_user_formatter(Array(CPU, BF16), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool { return cpu_array_fmt(BF16, fi, arg, verb) })
-    fmt.register_user_formatter(Array(Cuda, i32), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool { return cuda_array_fmt(i32, fi, arg, verb) })
-    fmt.register_user_formatter(Array(Cuda, f32), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool { return cuda_array_fmt(f32, fi, arg, verb) })
-    fmt.register_user_formatter(Array(Cuda, BF16), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool { return cuda_array_fmt(BF16, fi, arg, verb) })
+	fmt.register_user_formatter(BF16, fmt_bfloat16)
+	fmt.register_user_formatter(Shape, fmt_shape)
+	fmt.register_user_formatter(Array(CPU, i32), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {return cpu_array_fmt(i32, fi, arg, verb)})
+	fmt.register_user_formatter(Array(CPU, f32), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {return cpu_array_fmt(f32, fi, arg, verb)})
+	fmt.register_user_formatter(Array(CPU, BF16), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {return cpu_array_fmt(BF16, fi, arg, verb)})
+	fmt.register_user_formatter(Array(Cuda, i32), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {return cuda_array_fmt(i32, fi, arg, verb)})
+	fmt.register_user_formatter(Array(Cuda, f32), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {return cuda_array_fmt(f32, fi, arg, verb)})
+	fmt.register_user_formatter(Array(Cuda, BF16), proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {return cuda_array_fmt(BF16, fi, arg, verb)})
 }
 
 fmt_bfloat16 :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
@@ -43,10 +43,10 @@ fmt_shape :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
 }
 
 Array_Fmt_State :: struct {
-	fi: ^fmt.Info,
-	verb: rune,
-	indent: int,
-	newline: int,
+	fi:        ^fmt.Info,
+	verb:      rune,
+	indent:    int,
+	newline:   int,
 	summarize: bool,
 }
 
@@ -68,7 +68,7 @@ array_fmt :: proc(a: Array(CPU, $T), fi: ^fmt.Info, verb: rune) -> bool {
 	fi2.state = {}
 	_puts(fi, "Array<")
 	info: ^runtime.Type_Info
-	info = type_info_of(T)	
+	info = type_info_of(T)
 	fmt.fmt_value(&fi2, info, 's')
 	_putc(fi, '>')
 	if a.dptr == nil {
@@ -85,7 +85,11 @@ array_fmt :: proc(a: Array(CPU, $T), fi: ^fmt.Info, verb: rune) -> bool {
 				fi.prec, fi.prec_set = Default_Precision, true
 			}
 		}
-		s := Array_Fmt_State{fi = fi, verb = verb, summarize = Threshold > 0 && a.size > Threshold}
+		s := Array_Fmt_State {
+			fi        = fi,
+			verb      = verb,
+			summarize = Threshold > 0 && a.size > Threshold,
+		}
 		fmt_array_data(&s, a)
 		_putc(fi, '\n')
 	}
@@ -100,7 +104,7 @@ fmt_array_data :: proc(s: ^Array_Fmt_State, a: Array(CPU, $T), pos: []int = nil,
 	}
 	ix := len(pos)
 	if ix == a.ndims {
-		if pos[ix-1] > 0 do _putc(s.fi, ' ')
+		if pos[ix - 1] > 0 do _putc(s.fi, ' ')
 		if dummy {
 			fmt.fmt_string(s.fi, "...", 's')
 		} else {
@@ -112,12 +116,12 @@ fmt_array_data :: proc(s: ^Array_Fmt_State, a: Array(CPU, $T), pos: []int = nil,
 	if ix > 0 {
 		s.indent += 1
 	}
-	if s.summarize && a.dims[ix] > 2*Edgeitems {
+	if s.summarize && a.dims[ix] > 2 * Edgeitems {
 		for i in 0 ..< Edgeitems {
 			fmt_array_data(s, a, pos[:], i, dummy)
 		}
 		fmt_array_data(s, a, pos[:], Edgeitems, true)
-		for i in a.dims[ix]-Edgeitems ..< a.dims[ix] {
+		for i in a.dims[ix] - Edgeitems ..< a.dims[ix] {
 			fmt_array_data(s, a, pos[:], i, dummy)
 		}
 	} else {
@@ -127,11 +131,11 @@ fmt_array_data :: proc(s: ^Array_Fmt_State, a: Array(CPU, $T), pos: []int = nil,
 	}
 	row, rows := 0, 1
 	if ix > 0 {
-		row, rows = pos[ix-1], a.dims[ix-1]
+		row, rows = pos[ix - 1], a.dims[ix - 1]
 	}
 	_putc(s.fi, ']')
 	s.newline += 1
-	if row < rows-1 {
+	if row < rows - 1 {
 		_putc(s.fi, '\n', s.newline)
 		_putc(s.fi, ' ', s.indent)
 		s.newline = 0

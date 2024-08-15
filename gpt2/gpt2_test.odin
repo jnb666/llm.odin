@@ -1,9 +1,9 @@
 package gpt2
 
-import "core:testing"
-import "core:log"
 import "core:bytes"
+import "core:log"
 import "core:slice"
+import "core:testing"
 
 import "../nn"
 import "../util"
@@ -41,7 +41,13 @@ encode_test :: proc(t: ^testing.T) {
 
 @(test)
 init_test :: proc(t: ^testing.T) {
-	cfg := Config{num_layers=12, num_heads=12, channels=768, max_seq=1024, vocab_size=50257}
+	cfg := Config {
+		num_layers = 12,
+		num_heads  = 12,
+		channels   = 768,
+		max_seq    = 1024,
+		vocab_size = 50257,
+	}
 	pad_vocab(&cfg)
 	log.debug(cfg)
 
@@ -54,7 +60,13 @@ init_test :: proc(t: ^testing.T) {
 
 @(test)
 summary_test :: proc(t: ^testing.T) {
-	cfg := Config{num_layers=12, num_heads=12, channels=768, max_seq=1024, vocab_size=50257}
+	cfg := Config {
+		num_layers = 12,
+		num_heads  = 12,
+		channels   = 768,
+		max_seq    = 1024,
+		vocab_size = 50257,
+	}
 	pad_vocab(&cfg)
 	log.debug(cfg)
 
@@ -62,14 +74,16 @@ summary_test :: proc(t: ^testing.T) {
 	defer delete_model(model)
 	build(model, 4, 256)
 
-	buf: bytes.Buffer 
+	buf: bytes.Buffer
 	defer bytes.buffer_destroy(&buf)
 	nn.write_summary(bytes.buffer_to_stream(&buf), &model.layer)
 	summary := bytes.buffer_to_string(&buf)
 	log.debugf("\n%s", summary)
 
-	testing.expect_value(t, summary, 
-`┌─────────────────────────────────────────────────────────────────────────────────────────┐
+	testing.expect_value(
+		t,
+		summary,
+		`┌─────────────────────────────────────────────────────────────────────────────────────────┐
 │                      == GPT2_124M - device: CPU, data type: f32 ==                      │
 ├───────────────────────────────────────────────────────┬─────────────────┬───────────────┤
 │  Layer                                                │  Output shape   │  Parameters   │
@@ -92,5 +106,6 @@ summary_test :: proc(t: ^testing.T) {
 │                                                       │                 │       ──────  │
 │                                                       │                 │  124,475,904  │
 └───────────────────────────────────────────────────────┴─────────────────┴───────────────┘
-`)
+`,
+	)
 }
