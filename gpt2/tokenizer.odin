@@ -9,11 +9,32 @@ import "core:strings"
 import "core:unicode"
 import "core:unicode/utf8"
 
+import "../nn"
 import "../util"
 
 End_Token :: "<|endoftext|>"
 
 End_Token_ID :: 50256
+
+// Implement nn.Tokenizer interface
+tokenizer :: proc() -> nn.Tokenizer(u16) {
+	tok := new_tokenizer()
+	t: nn.Tokenizer(u16)
+	t.state = tok
+	t.encode = proc(state: rawptr, text: string, tokens: ^[dynamic]u16) {
+		encode_to(cast(^Tokenizer)state, text, tokens)
+	}
+	t.decode = proc(state: rawptr, tokens: []u16) -> string {
+		return decode(cast(^Tokenizer)state, tokens)
+	}
+	t.delete = proc(state: rawptr) {
+		delete_tokenizer(cast(^Tokenizer)state)
+	}
+	t.vocab_size = vocab_size(tok)
+	t.end_token = End_Token_ID
+	return t
+}
+
 
 // Tokenizer to convert between text and integer tokens using GPT-2 byte pair encoding
 Tokenizer :: struct {
@@ -110,12 +131,6 @@ delete_tokenizer :: proc(t: ^Tokenizer) {
 }
 
 // Encode text string to list of tokens using byte pair encoding.
-encode :: proc(t: ^Tokenizer, text: string) -> []u16 {
-	tokens: [dynamic]u16
-	encode_to(t, text, &tokens)
-	return tokens[:]
-}
-
 encode_to :: proc(t: ^Tokenizer, text: string, tokens: ^[dynamic]u16) {
 	parts := strings.split(text, End_Token)
 	defer delete(parts)
@@ -196,7 +211,7 @@ encode_word :: proc(t: ^Tokenizer, text: string, tokens: ^[dynamic]u16) {
 }
 
 // Decode tokens back to original text string.
-decode :: proc(t: ^Tokenizer, tokens: ..u16) -> string {
+decode :: proc(t: ^Tokenizer, tokens: []u16) -> string {
 	b: bytes.Buffer
 	for tok in tokens {
 		item, ok := t.decoder[tok]

@@ -22,22 +22,23 @@ load_tokenizer_test :: proc(t: ^testing.T) {
 
 @(test)
 encode_test :: proc(t: ^testing.T) {
-	tok := new_tokenizer()
-	defer delete_tokenizer(tok)
+	tok := tokenizer()
+	defer nn.delete_tokenizer(&tok)
 
 	test_string := "Hello!! I'm Andrej Karpathy. It's 2022. w00t :D 🤗<|endoftext|>"
 	expect_tokens := []u16{15496, 3228, 314, 1101, 10948, 73, 509, 5117, 10036, 13, 632, 338, 33160, 13, 266, 405, 83, 1058, 35, 12520, 97, 245, 50256}
 
-	tokens := encode(tok, test_string)
+	tokens := nn.encode(&tok, test_string)
 	defer delete(tokens)
 	log.debug("tokens:", tokens)
 	testing.expect(t, slice.equal(tokens, expect_tokens))
 
-	text := decode(tok, ..tokens)
+	text := nn.decode(&tok, ..tokens)
 	defer delete(text)
 	log.debug("decoded:", text)
 	testing.expect_value(t, text, test_string)
 }
+
 
 @(test)
 init_test :: proc(t: ^testing.T) {

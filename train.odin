@@ -20,6 +20,7 @@ Train_Options :: struct {
 	debug:        bool `usage:"enable debug logging"`,
 	track:        bool `usage:"use tracking allocator to find memory leaks"`,
 	cuda:         bool `usage:"use Cuda acceleration - default true"`,
+	config:       string `usage:"initialize new model with config from json file"`,
 	model:        string `usage:"model checkpoint file - default gpt2_124M.bin"`,
 	dataset:      string `usage:"dataset file name"`,
 	verbose:      bool `usage:"show verbose output"`,
@@ -28,6 +29,7 @@ Train_Options :: struct {
 	val_every:    int `usage:"check validation loss every n steps - default 20"`,
 	sample_every: int `usage:"sample output every n steps - default 100"`,
 	save_every:   int `usage:"save checkpoint every n steps - default 100"`,
+	tokenizer:    string `usage:"tokenizer name (gpt2, byte) - default gpt2"`,
 	sample_len:   int `usage:"length of sample text - default 256"`,
 	temperature:  f32 `usage:"sampler temperature parameter - default 1.0"`,
 	top_p:        f32 `usage:"sampler top_p parameter - default 0.9"`,
@@ -37,6 +39,8 @@ Train_Options :: struct {
 	learn_rate:   f32 `usage:"AdamW learning rate parameter - default 3e-4"`,
 	weight_decay: f32 `usage:"AdamW weight decay parameter"`,
 	grad_clip:    f32 `usage:"AdamW gradient clip parameter"`,
+	beta1:        f32 `usage:AdamW beta1 parameter - default 0.9"`,
+	beta2:        f32 `usage:AdamW beta2 parameter - default 0.95"`,
 	recompute:    bool `usage:"recompute Gelu activations to save memory - default true"`,
 	nonstop:      bool `usage:"don't stop generating text when get the end token"`,
 	plot:         bool `usage:"plot loss values to a webview window"`,
@@ -46,6 +50,7 @@ Train_Options :: struct {
 train_main :: proc(args: []string) {
 	opt := Train_Options {
 		model        = "gpt2_124M.bin",
+		tokenizer    = "gpt2",
 		steps        = 50,
 		val_every    = 20,
 		val_steps    = 20,
@@ -53,6 +58,8 @@ train_main :: proc(args: []string) {
 		batch        = 4,
 		seq_len      = 1024,
 		learn_rate   = 3e-4,
+		beta1        = 0.9,
+		beta2        = 0.95,
 		sample_every = 100,
 		sample_len   = 256,
 		temperature  = 1.0,
@@ -74,42 +81,38 @@ train_run :: proc(opt_ptr: rawptr) {
 	}
 }
 
+
 train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 	// load and initialise model
-	model_file := data_file(opt.model, "snapshots")
-	model, err := gpt2.load_checkpoint(Device, Type, model_file)
-	if err != nil {
-		fatal_error("Error loading %s: %v", model_file, err)
-	}
-	delete(model_file)
+	model, tokenizer := load_model(Device, Type, opt)
 	defer gpt2.delete_model(model)
-	if opt.seq_len > model.max_seq {
-		log.fatalf("requested seqlen=%d is greater than model max_seq=%d", opt.seq_len, model.max_seq)
-		os.exit(1)
-	}
-	model.recompute_gelu = opt.recompute
-	log.info(model.config)
+	defer nn.delete_tokenizer(&tokenizer)
 	gpt2.build(model, opt.batch, opt.seq_len)
 	if opt.verbose {
 		nn.write_summary(stdout, &model.layer)
 	}
-	tokenizer := gpt2.new_tokenizer()
-	defer gpt2.delete_tokenizer(tokenizer)
 
 	// load training and validation data
 	train_data := load_dataset(Device, opt, train = true)
 	defer nn.delete_dataset(train_data)
-
 	test_data := load_dataset(Device, opt, train = false)
 	defer nn.delete_dataset(test_data)
 
 	// initialize optimizer
-	adamw := nn.new_optimizer(&model.layer, learning_rate = opt.learn_rate, weight_decay = opt.weight_decay, gradient_clip = opt.grad_clip)
+	adamw := nn.new_optimizer(
+		&model.layer,
+		learning_rate = opt.learn_rate,
+		weight_decay = opt.weight_decay,
+		gradient_clip = opt.grad_clip,
+		beta1 = opt.beta1,
+		beta2 = opt.beta2,
+	)
 	log.infof("%.4v", adamw.config)
 	defer nn.delete_optimizer(adamw)
 
 	// GUI - plotting
 	stats: plot.Stats
+	defer plot.delete_stats(&stats)
 	view := opt.plot ? plot.start(Plot_Width, Plot_Height, xrange = {opt.steps + 1}) : nil
 
 	// main training loop
@@ -118,6 +121,7 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 	mean_norm, mean_loss: util.Running_Mean
 	checkpoint_file := checkpoint_filename(opt.model, opt.dataset)
 	defer delete(checkpoint_file)
+	prompt := [1]u16{opt.tokenizer == "gpt2" ? gpt2.End_Token_ID : '\n'}
 
 	for step in 1 ..= opt.steps {
 		start_step := time.now()
@@ -134,12 +138,17 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 		} else {
 			log_stats(Device, opt, &stats, step, time.since(start_step), loss, mean_norm.value, mean_loss.value)
 		}
-		if step == opt.steps || step % opt.sample_every == 0 {
-			sample_text(model, tokenizer, opt, step, &stats)
-		}
 		if opt.plot {
-			if err := plot.draw(view, &stats); err != nil {
+			if err := plot.update_plot(view, &stats); err != nil {
 				log.error("Error updating plot:", err)
+			}
+		}
+		if step == opt.steps || step % opt.sample_every == 0 {
+			sample_text(model, &tokenizer, prompt[:], opt, step, &stats)
+			if opt.plot {
+				if err := plot.update_table(view, &stats); err != nil {
+					log.error("Error updating table:", err)
+				}
 			}
 		}
 		if step == opt.steps || step % opt.save_every == 0 {
@@ -154,6 +163,38 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 	if opt.plot {
 		plot.wait(view)
 	}
+}
+
+load_model :: proc($Device, $Type: typeid, opt: ^Train_Options) -> (model: ^gpt2.Model(Device, Type), tok: nn.Tokenizer(u16)) {
+	err: os.Error
+	tok = new_tokenizer(opt.tokenizer)
+	if opt.config != "" {
+		cfg: gpt2.Config
+		err = unmarshal_json_file(opt.config, &cfg)
+		if err != nil {
+			fatal_error("Error loading config %s: %v", opt.config, err)
+		}
+		cfg.max_seq = opt.seq_len
+		cfg.vocab_size = tok.vocab_size
+		cfg.recompute_gelu = opt.recompute
+		gpt2.pad_vocab(&cfg)
+		log.info(cfg)
+		model = gpt2.new_model(Device, Type, cfg)
+		gpt2.init_weights(model)
+	} else {
+		model_file := data_file(opt.model, "snapshots")
+		defer delete(model_file)
+		model, err = gpt2.load_checkpoint(Device, Type, model_file)
+		if err != nil {
+			fatal_error("Error loading model %s: %v", model_file, err)
+		}
+		if opt.seq_len > model.max_seq {
+			fatal_error("requested seqlen=%d is greater than model max_seq=%d", opt.seq_len, model.max_seq)
+		}
+		model.recompute_gelu = opt.recompute
+		log.info(model.config)
+	}
+	return model, tok
 }
 
 log_stats :: proc($Device: typeid, opt: ^Train_Options, s: ^plot.Stats, step: int, elapsed: time.Duration, batch_loss, norm, loss: f32, val_loss: f32 = -1) {
@@ -171,23 +212,25 @@ log_stats :: proc($Device: typeid, opt: ^Train_Options, s: ^plot.Stats, step: in
 }
 
 Sample_Context :: struct {
-	tok: ^gpt2.Tokenizer,
+	tok: ^nn.Tokenizer(u16),
 	buf: strings.Builder,
 }
 
-sample_text :: proc(model: ^gpt2.Model($D, $T), tokenizer: ^gpt2.Tokenizer, opt: ^Train_Options, step: int, s: ^plot.Stats) {
+sample_text :: proc(model: ^gpt2.Model($D, $T), tokenizer: ^nn.Tokenizer(u16), prompt: []u16, opt: ^Train_Options, step: int, s: ^plot.Stats) {
 	log.debugf("sample text: step=%d", step)
 	sampler := nn.Sampler {
 		temperature = opt.temperature,
 		top_k       = opt.top_k,
 		top_p       = opt.top_p,
 	}
-	prompt := [1]u16{gpt2.End_Token_ID}
-	stop := !opt.nonstop ? gpt2.End_Token_ID : -1
+	stop := -1
+	if end_tok, ok := tokenizer.end_token.?; ok && !opt.nonstop {
+		stop = int(end_tok)
+	}
 	ctx := Sample_Context {
 		tok = tokenizer,
 	}
-	gpt2.generate(model, sampler, &ctx, sample_callback, prompt[:], max_length = opt.sample_len, stop_token = stop)
+	gpt2.generate(model, sampler, &ctx, sample_callback, prompt, max_length = opt.sample_len, stop_token = stop)
 	text := strings.to_string(ctx.buf)
 	plot.add_sample(s, step, strings.trim_space(text))
 	if !opt.plot {
@@ -198,10 +241,10 @@ sample_text :: proc(model: ^gpt2.Model($D, $T), tokenizer: ^gpt2.Tokenizer, opt:
 
 sample_callback :: proc(p: rawptr, token: u16, done: bool) {
 	ctx := cast(^Sample_Context)p
-	if token == gpt2.End_Token_ID {
+	if end, ok := ctx.tok.end_token.?; ok && token == end {
 		fmt.sbprint(&ctx.buf, "\n\n")
 	} else {
-		text := gpt2.decode(ctx.tok, token)
+		text := nn.decode(ctx.tok, token)
 		fmt.sbprint(&ctx.buf, text)
 		delete(text)
 	}

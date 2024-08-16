@@ -43,13 +43,18 @@ For example to generate some text using the 124M GPT2 pre-trained model download
 
 ## Training
 
-To finetine the GPT-2 124M model on the tiny shakespeare dataset run:
+To finetine the GPT-2 124M model on the tiny_shakespeare dataset run:
 
 `./llm train -dataset tiny_shakespeare -steps 50 -val-every 5`
 
 and to generate text from the saved checkpoint:
 
 `./llm generate -model gpt2_124M_tiny_shakespeare.bin -nonstop -maxlen 512"`
+
+Example training a small model from scratch on the tiny_shakespeare dataset encoded using a byte tokenizer:
+
+`./llm train -dataset tiny_shakespeare_char -tokenizer byte -batch 64 -seq-len 1024 -config gpt2_small.json \
+  -grad-clip 1 -beta2 0.99 -steps 1000 -val-every 100 -sample-len 512 -save-every 500 -nonstop`
 
 Run `./llm <command> --help` or see the source for all the command line options.
 

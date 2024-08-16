@@ -13,7 +13,9 @@ import "core:time"
 
 import "../back"
 import "array"
+import "gpt2"
 import "nn"
+
 
 Array :: array.Array
 BF16 :: array.BF16
@@ -117,15 +119,28 @@ parse_args :: proc(model: ^$T, program: string, args: []string) {
 	}
 }
 
-fatal_error :: proc(format: string, args: ..any) {
+fatal_error :: proc(format: string, args: ..any) -> ! {
 	log.fatalf(format, ..args)
 	os.exit(1)
 }
 
-unmarshal_json_file :: proc(file_name: string, ptr: ^$T) -> os.Error {
+// get named tokenizer
+new_tokenizer :: proc(name: string) -> nn.Tokenizer(u16) {
+	switch name {
+	case "gpt2":
+		return gpt2.tokenizer()
+	case "byte":
+		return nn.byte_tokenizer()
+	case:
+		fatal_error("unknown tokenizer: %s", name)
+	}
+}
+
+// read data from file unmarshal into value pointed to by ptr
+unmarshal_json_file :: proc(file_name: string, ptr: ^$T, allocator := context.allocator) -> os.Error {
 	data := os.read_entire_file_or_err(file_name) or_return
 	defer delete(data)
-	if err := json.unmarshal(data, ptr); err != nil {
+	if err := json.unmarshal(data, ptr, allocator = allocator); err != nil {
 		log.panic(err)
 	}
 	return nil

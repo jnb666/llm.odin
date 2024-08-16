@@ -94,7 +94,9 @@ init_weights :: proc(m: ^Model($Dev, $Typ), weight_scale: f32 = 0.02) {
 			case "Linear":
 				sigma := strings.has_suffix(l.name, "proj") ? weight_scale / proj_scale : weight_scale
 				nn.normal_init(l.params[0].arr, stddev = sigma)
-				array.zero(l.params[1].arr)
+				if len(l.params) == 2 {
+					array.zero(l.params[1].arr)
+				}
 			case "Encoder":
 				// for wte - note that weights may be padded - only init the ones that are used
 				array.zero(l.params[0].arr)
@@ -199,6 +201,7 @@ generate :: proc(
 	for !done {
 		array.copy(input, tokens)
 		forward(m, input, train = false)
+		log.debugf("logits = %v, vocab_size = %d/%d, t = %d", m.act.logits.shape, m.vocab_size, m.vocab_padded, t)
 		output := array.view(m.act.logits, {m.vocab_size}, offset = (t - 1) * m.vocab_padded)
 		array.copy(logits, output)
 		token := nn.sample(sampler, logits)

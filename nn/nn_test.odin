@@ -7,6 +7,21 @@ import "core:testing"
 import "../array"
 import "../util"
 
+@(test)
+tokenizer_test :: proc(t: ^testing.T) {
+	tok := byte_tokenizer()
+	defer delete_tokenizer(&tok)
+	text := "Hello, 世界"
+	tokens := encode(&tok, text)
+	defer delete(tokens)
+	log.debug(tokens)
+	testing.expect_value(t, len(tokens), 13)
+	decoded := decode(&tok, ..tokens)
+	defer delete(decoded)
+	log.debug(decoded)
+	testing.expect(t, decoded == text)
+}
+
 uniform_init_func :: proc(ctx: rawptr) -> f32 {
 	return rand.float32()
 }

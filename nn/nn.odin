@@ -1,6 +1,7 @@
 package nn
 
 import "base:runtime"
+import "core:bytes"
 import "core:fmt"
 import "core:io"
 import "core:log"
@@ -20,6 +21,58 @@ Shape :: array.Shape
 BF16 :: array.BF16
 CPU :: array.CPU
 Cuda :: array.Cuda
+
+// Generic Tokenizer interface type
+Tokenizer :: struct($T: typeid) {
+	state:      rawptr,
+	encode:     proc(state: rawptr, text: string, tokens: ^[dynamic]T),
+	decode:     proc(state: rawptr, tokens: []T) -> string,
+	delete:     proc(state: rawptr),
+	vocab_size: int,
+	end_token:  Maybe(T),
+}
+
+// Simple byte tokenizer implementation
+byte_tokenizer :: proc() -> Tokenizer(u16) {
+	t: Tokenizer(u16)
+	t.encode = proc(state: rawptr, text: string, tokens: ^[dynamic]u16) {
+		for i in 0 ..< len(text) {
+			append(tokens, u16(text[i]))
+		}
+	}
+	t.decode = proc(state: rawptr, tokens: []u16) -> string {
+		b: bytes.Buffer
+		for t in tokens {
+			assert(t < 256, "token out of range")
+			bytes.buffer_write_byte(&b, u8(t))
+		}
+		return bytes.buffer_to_string(&b)
+	}
+	t.delete = proc(state: rawptr) {}
+	t.vocab_size = 256
+	return t
+}
+
+// Encode text to tokens
+encode :: proc(t: ^Tokenizer($Token), text: string) -> []Token {
+	tokens: [dynamic]Token
+	t.encode(t.state, text, &tokens)
+	return tokens[:]
+}
+
+encode_to :: proc(t: ^Tokenizer($Token), text: string, tokens: ^[dynamic]Token) {
+	t.encode(t.state, text, tokens)
+}
+
+// Decode from tokens back to text
+decode :: proc(t: ^Tokenizer($Token), tokens: ..Token) -> string {
+	return t.decode(t.state, tokens)
+}
+
+// Call tokenizer delete method
+delete_tokenizer :: proc(t: ^Tokenizer($Token)) {
+	t.delete(t.state)
+}
 
 // Compile cuda kernels to ptx - will panic on compile error.
 @(init)

@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:io"
 import "core:log"
 import "core:math"
+import "core:mem"
 import "core:os"
 import "core:path/filepath"
 import "core:slice"
@@ -138,4 +139,15 @@ comma_format :: proc(n: int) -> string {
 	}
 	format(&b, n)
 	return strings.to_string(b)
+}
+
+// Simple template parser - replaces {{var}} strings in text with fields[var]. Also replaces \n escapes with linefeeds.
+parse_template :: proc(text: string, fields: map[string]string, allocator := context.allocator) -> string {
+	text := text
+	for key, val in fields {
+		k := strings.concatenate({"{{", key, "}}"}, allocator = allocator)
+		text, _ = strings.replace_all(text, k, val, allocator = allocator)
+	}
+	text, _ = strings.replace_all(text, "\\n", "\n", allocator = allocator)
+	return text
 }

@@ -1,0 +1,6 @@
+{
+	"num_layers": 6,
+	"num_heads": 6,
+	"channels": 384,
+	"no_bias": true
+}

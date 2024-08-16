@@ -91,7 +91,7 @@ next_batch :: proc(d: ^Dataset($Device)) -> bool {
 		}
 		return true
 	}
-	if d.offset + n * d.batch_size >= len(d.tokens) {
+	if d.offset + n * d.batch_size > len(d.tokens) {
 		return false
 	}
 	for i in 0 ..< d.batch_size {

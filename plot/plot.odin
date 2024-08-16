@@ -3,10 +3,13 @@ package plot
 import "core:encoding/json"
 import "core:fmt"
 import "core:log"
+import "core:mem"
 import "core:strings"
 import "core:sync"
 import "core:thread"
 import "core:time"
+
+import "../util"
 
 Max_Line_Length :: 100
 
@@ -101,11 +104,14 @@ set_xrange :: proc(c: ^Context, xmin, xmax: int) -> Webview_Error {
 	return webview_eval(c.webview, strings.unsafe_string_to_cstring(update))
 }
 
-// Draw the plot traces from c.stats 
-draw :: proc(c: ^Context, stats: ^Stats) -> Webview_Error {
-	call_js(c, "updatePlot", stats.traces) or_return
-	call_js(c, "updateTable", stats.samples) or_return
-	return nil
+// Draw the plot traces 
+update_plot :: proc(c: ^Context, stats: ^Stats) -> Webview_Error {
+	return call_js(c, "updatePlot", stats.traces)
+}
+
+// Refresh the table of samples
+update_table :: proc(c: ^Context, stats: ^Stats) -> Webview_Error {
+	return call_js(c, "updateTable", stats.samples)
 }
 
 call_js :: proc(c: ^Context, function: string, value: $T) -> Webview_Error {
@@ -152,7 +158,7 @@ webview_thread :: proc(c: ^Context) {
 	webview_set_title(w, "Odin llm plot")
 	webview_set_size(w, i32(c.width), i32(c.height), .NONE)
 	height := f64(c.height - 2 * c.border)
-	content := get_html(c.width - 2 * c.border, int(height * 0.6), c.table_header, int(height * 0.4) - c.table_header)
+	content := get_html(c.width - 2 * c.border, int(height * 0.6), int(height * 0.4) - c.table_header, c.table_header)
 	must(webview_set_html(w, content))
 	delete(content)
 	// called from webview JS once initialization is done
@@ -167,10 +173,16 @@ webview_thread :: proc(c: ^Context) {
 	log.debug("webview closed")
 }
 
-get_html :: proc(width, plot_height, table_header, table_body: int) -> cstring {
+get_html :: proc(width, plot_height, table_height, table_header: int) -> cstring {
 	plot_template := #load("plot.html", string)
-	html := fmt.aprintf(plot_template, width, plot_height, table_header, table_body)
-	defer delete(html)
-	//log.debug(html)
+	fields := map[string]string {
+		"width"        = fmt.aprint(width, allocator = context.temp_allocator),
+		"plot_height"  = fmt.aprint(plot_height, allocator = context.temp_allocator),
+		"table_height" = fmt.aprint(table_height, allocator = context.temp_allocator),
+		"table_header" = fmt.aprint(table_header, allocator = context.temp_allocator),
+	}
+	defer mem.free_all(context.temp_allocator)
+	defer delete(fields)
+	html := util.parse_template(plot_template, fields, allocator = context.temp_allocator)
 	return strings.clone_to_cstring(html)
 }

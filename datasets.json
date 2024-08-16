@@ -5,6 +5,13 @@
 		"val_tokens": 65536,
 		"record_separator": "\n\n"
 	},
+	"tiny_shakespeare_char": {
+		"train_source": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt",
+		"train_file": "tiny_shakespeare.txt",
+		"val_tokens": 65536,
+		"record_separator": "\n\n",
+		"tokenizer": "byte"
+	},
 	"tiny_stories": {
 		"train_source": "https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt",
 		"val_source": "https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-valid.txt",
@@ -12,5 +19,13 @@
 		"val_file": "tiny_stories-val.txt",
 		"record_separator": "<|endoftext|>",
 		"trim_space": true
+	},
+	"poems": {
+		"train_source": "https://huggingface.co/datasets/jnb666/poems/resolve/main/poems-train.jsonl",
+		"val_source": "https://huggingface.co/datasets/jnb666/poems/resolve/main/poems-val.jsonl",
+		"train_file": "poems-train.jsonl",
+		"val_file": "poems-val.jsonl",
+		"format": "jsonl",
+		"template": "{{title}}\n\n{{body}}"
 	}
 }
