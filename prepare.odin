@@ -3,7 +3,7 @@ package main
 import "core:encoding/json"
 import "core:fmt"
 import "core:log"
-import "core:mem"
+import "core:mem/virtual"
 import "core:os"
 import "core:strings"
 
@@ -46,10 +46,17 @@ prepare_run :: proc(opt_ptr: rawptr) {
 	log.debugf("\n%v", opt)
 	config := make(map[string]Dataset_Config)
 	defer delete(config)
-	err := unmarshal_json_file(opt.config, &config)
+
+	arena: virtual.Arena
+	if err := virtual.arena_init_growing(&arena); err != nil {
+		log.panic(err)
+	}
+	cfg_alloc := virtual.arena_allocator(&arena)
+	err := unmarshal_json_file(opt.config, &config, allocator = cfg_alloc)
 	if err != nil {
 		fatal_error("error reading file: %s", opt.config)
 	}
+	defer free_all(cfg_alloc)
 	cfg, ok := config[opt.dataset]
 	if !ok {
 		fatal_error("dataset %s not defined in config", opt.dataset)
@@ -188,7 +195,7 @@ tokenize_jsonl :: proc(tok: ^nn.Tokenizer(u16), data: string, cfg: Dataset_Confi
 		}
 		n += 1
 		done += len(record) + 1
-		mem.free_all(context.temp_allocator)
+		free_all(context.temp_allocator)
 	}
 	fmt.printf("\rtokenized %d records%20s\n", n, "")
 	return tokens[:], nil

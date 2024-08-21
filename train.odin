@@ -17,33 +17,37 @@ Plot_Width :: 1000
 Plot_Height :: 1000
 
 Train_Options :: struct {
-	debug:        bool `usage:"enable debug logging"`,
-	track:        bool `usage:"use tracking allocator to find memory leaks"`,
-	cuda:         bool `usage:"use Cuda acceleration - default true"`,
-	config:       string `usage:"initialize new model with config from json file"`,
-	model:        string `usage:"model checkpoint file - default gpt2_124M.bin"`,
-	dataset:      string `usage:"dataset file name"`,
-	verbose:      bool `usage:"show verbose output"`,
-	steps:        int `usage:"number of training steps - default 50"`,
-	val_steps:    int `usage:"limit on number of validation batches- default 20"`,
-	val_every:    int `usage:"check validation loss every n steps - default 20"`,
-	sample_every: int `usage:"sample output every n steps - default 100"`,
-	save_every:   int `usage:"save checkpoint every n steps - default 100"`,
-	tokenizer:    string `usage:"tokenizer name (gpt2, byte) - default gpt2"`,
-	sample_len:   int `usage:"length of sample text - default 256"`,
-	temperature:  f32 `usage:"sampler temperature parameter - default 1.0"`,
-	top_p:        f32 `usage:"sampler top_p parameter - default 0.9"`,
-	top_k:        int `usage:"sampler top_k parameter"`,
-	batch:        int `usage:"number of samples in each training batch - default 4"`,
-	seq_len:      int `usage:"sequence length of each training sample - default 1024"`,
-	learn_rate:   f32 `usage:"AdamW learning rate parameter - default 3e-4"`,
-	weight_decay: f32 `usage:"AdamW weight decay parameter"`,
-	grad_clip:    f32 `usage:"AdamW gradient clip parameter"`,
-	beta1:        f32 `usage:AdamW beta1 parameter - default 0.9"`,
-	beta2:        f32 `usage:AdamW beta2 parameter - default 0.95"`,
-	recompute:    bool `usage:"recompute Gelu activations to save memory - default true"`,
-	nonstop:      bool `usage:"don't stop generating text when get the end token"`,
-	plot:         bool `usage:"plot loss values to a webview window"`,
+	debug:            bool `usage:"enable debug logging"`,
+	track:            bool `usage:"use tracking allocator to find memory leaks"`,
+	cuda:             bool `usage:"use Cuda acceleration - default true"`,
+	config:           string `usage:"initialize new model with config from json file"`,
+	model:            string `usage:"model checkpoint file - default gpt2_124M.bin"`,
+	dataset:          string `usage:"dataset file name"`,
+	verbose:          bool `usage:"show verbose output"`,
+	steps:            int `usage:"number of training steps - default 50"`,
+	val_steps:        int `usage:"limit on number of validation batches- default 20"`,
+	val_every:        int `usage:"check validation loss every n steps - default 20"`,
+	sample_every:     int `usage:"sample output every n steps - default 100"`,
+	save_every:       int `usage:"save checkpoint every n steps - default 100"`,
+	tokenizer:        string `usage:"tokenizer name (gpt2, byte) - default gpt2"`,
+	sample_len:       int `usage:"length of sample text - default 256"`,
+	temperature:      f32 `usage:"sampler temperature parameter - default 1.0"`,
+	top_p:            f32 `usage:"sampler top_p parameter - default 0.9"`,
+	top_k:            int `usage:"sampler top_k parameter"`,
+	batch:            int `usage:"number of samples in each training batch - default 4"`,
+	seq_len:          int `usage:"sequence length of each training sample - default 1024"`,
+	learn_rate:       f32 `usage:"AdamW learning rate parameter - default 3e-4"`,
+	cosine_decay:     bool `usage:"Enable cosine decay of learning rate"`,
+	warmup_steps:     int `usage:"Number of warmup steps if cosine decay enabled"`,
+	warmup_target:    f32 `usage:"Learning rate after warmup if cosine decay warmup enabled"`,
+	final_learn_rate: f32 `usage:"Final rate after cosine decay"`,
+	weight_decay:     f32 `usage:"AdamW weight decay parameter"`,
+	grad_clip:        f32 `usage:"AdamW gradient clip parameter"`,
+	beta1:            f32 `usage:AdamW beta1 parameter - default 0.9"`,
+	beta2:            f32 `usage:AdamW beta2 parameter - default 0.95"`,
+	recompute:        bool `usage:"recompute Gelu activations to save memory - default true"`,
+	nonstop:          bool `usage:"don't stop generating text when get the end token"`,
+	plot:             bool `usage:"plot loss values to a webview window"`,
 }
 
 // run test training session to compare model outputs with saved pytorch reference
@@ -109,6 +113,17 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 	)
 	log.infof("%.4v", adamw.config)
 	defer nn.delete_optimizer(adamw)
+	decay: nn.Cosine_Decay
+	if opt.cosine_decay {
+		decay = {
+			initial_rate  = opt.learn_rate,
+			final_rate    = opt.final_learn_rate,
+			decay_steps   = opt.steps - opt.warmup_steps,
+			warmup_target = opt.warmup_target,
+			warmup_steps  = opt.warmup_steps,
+		}
+		log.infof("%.4v", decay)
+	}
 
 	// GUI - plotting
 	stats: plot.Stats
@@ -132,11 +147,11 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 		if step == opt.steps || step % opt.val_every == 0 {
 			val_loss := calc_validation_loss(model, test_data, opt.val_steps)
 			elapsed := time.since(start_check) / time.Duration(opt.val_every)
-			log_stats(Device, opt, &stats, step, elapsed, loss, mean_norm.value, mean_loss.value, val_loss)
+			log_stats(Device, &stats, step, opt.steps, elapsed, adamw.learning_rate, loss, mean_norm.value, mean_loss.value, val_loss)
 			mean_norm, mean_loss = {}, {}
 			start_check = time.now()
 		} else {
-			log_stats(Device, opt, &stats, step, time.since(start_step), loss, mean_norm.value, mean_loss.value)
+			log_stats(Device, &stats, step, opt.steps, time.since(start_step), adamw.learning_rate, loss, mean_norm.value, mean_loss.value)
 		}
 		if opt.plot {
 			if err := plot.update_plot(view, &stats); err != nil {
@@ -155,6 +170,9 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 			if err := gpt2.save_checkpoint(model, checkpoint_file); err != nil {
 				log.error(err)
 			}
+		}
+		if opt.cosine_decay {
+			nn.decay_learning_rate(&decay, step, &adamw.learning_rate)
 		}
 	}
 
@@ -197,8 +215,8 @@ load_model :: proc($Device, $Type: typeid, opt: ^Train_Options) -> (model: ^gpt2
 	return model, tok
 }
 
-log_stats :: proc($Device: typeid, opt: ^Train_Options, s: ^plot.Stats, step: int, elapsed: time.Duration, batch_loss, norm, loss: f32, val_loss: f32 = -1) {
-	fmt.printf("\rstep % 3d/% 3d: norm % 6.2f  train loss % 6.3f  ", step, opt.steps, norm, loss)
+log_stats :: proc($Device: typeid, s: ^plot.Stats, step, steps: int, elapsed: time.Duration, learn_rate, batch_loss, norm, loss: f32, val_loss: f32 = -1) {
+	fmt.printf("\rstep % 3d/% 3d: lr % 7.2e  norm % 6.2f  train loss % 6.3f  ", step, steps, learn_rate, norm, loss)
 	buf: [64]u8
 	gpu_mem := max_device_memory_used(Device, buf[:])
 	plot.add(s, "training loss", step, batch_loss, width = 1, opacity = 0.5)
