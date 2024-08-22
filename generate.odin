@@ -15,7 +15,8 @@ Generate_Options :: struct {
 	debug:     bool `usage:"enable debug logging"`,
 	track:     bool `usage:"use tracking allocator to find memory leaks"`,
 	cuda:      bool `usage:"use Cuda acceleration - default true"`,
-	model:     string `usage:"model checkpoint file - default gpt2_124M.bin"`,
+	model:     string `usage:"model checkpoint file - default gpt2_124M_bf16.bin"`,
+	preset:    string `usage:"use saved huggingface model preset - gpt2, gpt2-medium, gpt2-large, gpt2-xl"`,
 	prompt:    string `usage:"input prompt string"`,
 	verbose:   bool `usage:"show verbose output"`,
 	maxlen:    int `usage:"max number of tokens generated- defalt 256"`,
@@ -36,7 +37,7 @@ Context :: struct {
 // run session to generate sample text from the model
 generate_main :: proc(args: []string) {
 	opt := Generate_Options {
-		model     = "gpt2_124M.bin",
+		model     = "gpt2_124M_bf16.bin",
 		maxlen    = 256,
 		tokenizer = "gpt2",
 		sampler   = "top_p",
@@ -60,13 +61,9 @@ generate_run :: proc(opt_ptr: rawptr) {
 }
 
 generate_start :: proc($Device, $Type: typeid, opt: ^Generate_Options) {
-	model_file := data_file(opt.model, "snapshots")
-	defer delete(model_file)
-	model, err := gpt2.load_checkpoint(Device, Type, model_file)
-	if err != nil {
-		fatal_error("Error loading %s: %v", model_file, err)
-	}
+	model := load_model(Device, Type, opt.preset, opt.model, opt.maxlen)
 	defer gpt2.delete_model(model)
+	log.info(model.config)
 	if opt.verbose {
 		nn.write_summary(stdout, &model.layer)
 	}
@@ -97,7 +94,9 @@ generate_start :: proc($Device, $Type: typeid, opt: ^Generate_Options) {
 
 	elapsed := time.duration_seconds(time.since(start))
 	fmt.println()
-	log.infof("Generated %d tokens in % .2fs - % .0fms/token", ctx.ntokens, elapsed, 1000 * elapsed / f64(ctx.ntokens))
+	buf: [80]u8
+	gpu_mem := max_device_memory_used(Device, buf[:])
+	log.infof("Generated %d tokens in % .2fs - % .0fms/token %s", ctx.ntokens, elapsed, 1000 * elapsed / f64(ctx.ntokens), gpu_mem)
 }
 
 get_prompt :: proc(s, end: string, debug: bool) -> string {

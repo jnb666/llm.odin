@@ -7,7 +7,6 @@ import "core:strings"
 import "core:time"
 
 import "array"
-import "cuda"
 import "gpt2"
 import "nn"
 import "plot"
@@ -21,7 +20,8 @@ Train_Options :: struct {
 	track:            bool `usage:"use tracking allocator to find memory leaks"`,
 	cuda:             bool `usage:"use Cuda acceleration - default true"`,
 	config:           string `usage:"initialize new model with config from json file"`,
-	model:            string `usage:"model checkpoint file - default gpt2_124M.bin"`,
+	model:            string `usage:"model checkpoint file - default gpt2_124M_bf16.bin"`,
+	preset:           string `usage:"use saved huggingface model preset - gpt2, gpt2-medium, gpt2-large, gpt2-xl"`,
 	dataset:          string `usage:"dataset file name"`,
 	verbose:          bool `usage:"show verbose output"`,
 	steps:            int `usage:"number of training steps - default 50"`,
@@ -53,7 +53,7 @@ Train_Options :: struct {
 // run test training session to compare model outputs with saved pytorch reference
 train_main :: proc(args: []string) {
 	opt := Train_Options {
-		model        = "gpt2_124M.bin",
+		model        = "gpt2_124M_bf16.bin",
 		tokenizer    = "gpt2",
 		steps        = 50,
 		val_every    = 20,
@@ -88,7 +88,7 @@ train_run :: proc(opt_ptr: rawptr) {
 
 train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 	// load and initialise model
-	model, tokenizer := load_model(Device, Type, opt)
+	model, tokenizer := new_model(Device, Type, opt)
 	defer gpt2.delete_model(model)
 	defer nn.delete_tokenizer(&tokenizer)
 	gpt2.build(model, opt.batch, opt.seq_len)
@@ -134,7 +134,7 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 	start_run := time.now()
 	start_check := time.now()
 	mean_norm, mean_loss: util.Running_Mean
-	checkpoint_file := checkpoint_filename(opt.model, opt.dataset)
+	checkpoint_file := checkpoint_filename(opt.preset, opt.model, opt.dataset)
 	defer delete(checkpoint_file)
 	prompt := [1]u16{opt.tokenizer == "gpt2" ? gpt2.End_Token_ID : '\n'}
 
@@ -183,12 +183,12 @@ train_start :: proc($Device, $Type: typeid, opt: ^Train_Options) {
 	}
 }
 
-load_model :: proc($Device, $Type: typeid, opt: ^Train_Options) -> (model: ^gpt2.Model(Device, Type), tok: nn.Tokenizer(u16)) {
+new_model :: proc($Device, $Type: typeid, opt: ^Train_Options) -> (model: ^gpt2.Model(Device, Type), tok: nn.Tokenizer(u16)) {
 	err: os.Error
 	tok = new_tokenizer(opt.tokenizer)
 	if opt.config != "" {
 		cfg: gpt2.Config
-		err = unmarshal_json_file(opt.config, &cfg)
+		err = util.unmarshal_json_file(opt.config, &cfg)
 		if err != nil {
 			fatal_error("Error loading config %s: %v", opt.config, err)
 		}
@@ -200,15 +200,7 @@ load_model :: proc($Device, $Type: typeid, opt: ^Train_Options) -> (model: ^gpt2
 		model = gpt2.new_model(Device, Type, cfg)
 		gpt2.init_weights(model)
 	} else {
-		model_file := data_file(opt.model, "snapshots")
-		defer delete(model_file)
-		model, err = gpt2.load_checkpoint(Device, Type, model_file)
-		if err != nil {
-			fatal_error("Error loading model %s: %v", model_file, err)
-		}
-		if opt.seq_len > model.max_seq {
-			fatal_error("requested seqlen=%d is greater than model max_seq=%d", opt.seq_len, model.max_seq)
-		}
+		model = load_model(Device, Type, opt.preset, opt.model, opt.seq_len)
 		model.recompute_gelu = opt.recompute
 		log.info(model.config)
 	}
@@ -309,23 +301,12 @@ load_dataset :: proc($Device: typeid, opt: ^Train_Options, train: bool) -> ^nn.D
 	return ds
 }
 
-checkpoint_filename :: proc(model, dataset: string) -> string {
-	model := model
-	if strings.has_suffix(model, ".bin") {
-		model = model[:len(model) - 4]
+checkpoint_filename :: proc(preset, model, dataset: string) -> string {
+	name := preset != "" ? preset : model
+	if strings.has_suffix(name, ".bin") {
+		name = name[:len(name) - 4]
 	}
-	file_name := strings.concatenate({model, "_", dataset, ".bin"})
+	file_name := strings.concatenate({name, "_", dataset, ".bin"})
 	defer delete(file_name)
 	return data_file(file_name, "snapshots")
-}
-
-max_device_memory_used :: proc($Device: typeid, buf: []u8) -> string {
-	when Device == Cuda {
-		dev := cuda.get_device()
-		used := cuda.get_mempool_attribute(dev, .USED_MEM_HIGH)
-		cuda.set_mempool_attribute(dev, .USED_MEM_HIGH, 0)
-		return fmt.bprintf(buf, "%d MB", used / (1024 * 1024))
-	} else {
-		return ""
-	}
 }

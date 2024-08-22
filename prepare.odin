@@ -52,7 +52,7 @@ prepare_run :: proc(opt_ptr: rawptr) {
 		log.panic(err)
 	}
 	cfg_alloc := virtual.arena_allocator(&arena)
-	err := unmarshal_json_file(opt.config, &config, allocator = cfg_alloc)
+	err := util.unmarshal_json_file(opt.config, &config, allocator = cfg_alloc)
 	if err != nil {
 		fatal_error("error reading file: %s", opt.config)
 	}

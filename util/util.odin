@@ -1,6 +1,8 @@
 package util
 
 import "base:intrinsics"
+import "core:bytes"
+import "core:encoding/json"
 import "core:fmt"
 import "core:io"
 import "core:log"
@@ -11,6 +13,7 @@ import "core:path/filepath"
 import "core:slice"
 import "core:strings"
 
+
 Cache_Dir :: "llm_odin"
 
 user_formatters: map[typeid]fmt.User_Formatter
@@ -18,6 +21,69 @@ user_formatters: map[typeid]fmt.User_Formatter
 @(init)
 init_formatters :: proc() {
 	fmt.set_user_formatters(&user_formatters)
+}
+
+foreign import libc "system:c"
+
+File :: distinct rawptr
+
+@(default_calling_convention = "c", private)
+foreign libc {
+	@(link_name = "system")
+	_system :: proc(command: cstring) -> i32 ---
+	popen :: proc(command: cstring, type: cstring) -> File ---
+	pclose :: proc(file: File) -> i32 ---
+	fgets :: proc(s: [^]byte, size: i32, stream: File) -> [^]u8 ---
+}
+
+// Fork and exec system process
+system :: proc(args: []string) -> (status: i32, err: os.Error) {
+	command := strings.join(args, " ")
+	defer delete(command)
+	cmd := strings.clone_to_cstring(command)
+	defer delete(cmd)
+	status = _system(cmd)
+	if status == -1 {
+		return -1, os.get_last_error()
+	}
+	return status, nil
+}
+
+// Fork and exec process - appends captured output to stdout buffer which is returned as a string
+do_cmd :: proc(command: string, stdout: ^[]byte) -> (output: string, status: i32, err: os.Error) {
+	cmd := strings.clone_to_cstring(command)
+	defer delete(cmd)
+	fp := popen(cmd, "r")
+	if fp == nil {
+		return "", -1, os.get_last_error()
+	}
+	read_buffer: [80]byte
+	index: int
+	for fgets(&read_buffer[0], size_of(read_buffer), fp) != nil {
+		read := bytes.index_byte(read_buffer[:], 0)
+		defer index += cast(int)read
+		if read > 0 && index + cast(int)read <= len(stdout) {
+			mem.copy(&stdout[index], &read_buffer[0], cast(int)read)
+		}
+	}
+	return string(stdout[:index]), pclose(fp), nil
+}
+
+// Download model file from huggingface.co repo - returns path of file in local cache
+huggingface_cache_file :: proc(model_name, file_name: string) -> (string, os.Error) {
+	cmd := strings.join({"huggingface-cli", "download", model_name, file_name}, " ")
+	defer delete(cmd)
+	buffer := make([]byte, 1024)
+	defer delete(buffer)
+	file, status, err := do_cmd(cmd, &buffer)
+	if err != nil {
+		return "", err
+	}
+	if status != 0 {
+		log.errorf("%s returns status %d", cmd, status / 256)
+		return "", .Invalid_File
+	}
+	return strings.clone(strings.trim_space(file)), nil
 }
 
 // Location for cache data - e.g. /home/user/.cache on linux
@@ -42,6 +108,28 @@ user_cache_dir :: proc() -> (dir: string, ok: bool) {
 		}
 	}
 	return "", false
+}
+
+make_dir_if_not_exist :: proc(name: string) {
+	if os.is_dir(name) {
+		return
+	}
+	if os.exists(name) {
+		log.panicf("%s is not a directory!", name)
+	}
+	if err := os.make_directory(name, 0o755); err != os.ERROR_NONE {
+		log.panicf("error creating %s dir: %v", name, err)
+	}
+}
+
+// read data from file unmarshal into value pointed to by ptr
+unmarshal_json_file :: proc(file_name: string, ptr: ^$T, allocator := context.allocator) -> os.Error {
+	data := os.read_entire_file_or_err(file_name) or_return
+	defer delete(data)
+	if err := json.unmarshal(data, ptr, allocator = allocator); err != nil {
+		log.panic(err)
+	}
+	return nil
 }
 
 // Create new sequence as 0..end or start..<end range.

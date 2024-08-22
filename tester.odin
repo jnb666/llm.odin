@@ -189,7 +189,7 @@ load_debug_state :: proc(file, loss_file: string, cfg: gpt2.Config) -> (s: ^Debu
 
 	if loss_file != "" {
 		log.info("loading mean losses from", loss_file)
-		err = unmarshal_json_file(loss_file, &s.losses)
+		err = util.unmarshal_json_file(loss_file, &s.losses)
 	}
 	return s, err
 }

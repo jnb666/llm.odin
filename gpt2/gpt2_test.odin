@@ -8,6 +8,20 @@ import "core:testing"
 import "../nn"
 import "../util"
 
+
+@(test)
+huggingface_test :: proc(t: ^testing.T) {
+	cfg, err := huggingface_get_config("gpt2")
+	log.debug(cfg)
+	testing.expect_value(t, err, nil)
+
+	model := new_model(CPU, f32, cfg)
+	defer delete_model(model)
+
+	err2 := huggingface_load_weights(model, "gpt2")
+	testing.expect_value(t, err2, nil)
+}
+
 @(test)
 load_tokenizer_test :: proc(t: ^testing.T) {
 	tok := new_tokenizer()

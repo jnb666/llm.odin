@@ -13,8 +13,10 @@ import "core:time"
 
 import "../back"
 import "array"
+import "cuda"
 import "gpt2"
 import "nn"
+import "util"
 
 
 Array :: array.Array
@@ -124,6 +126,30 @@ fatal_error :: proc(format: string, args: ..any) -> ! {
 	os.exit(1)
 }
 
+// Load model config and weights from preset or snapshot
+load_model :: proc($Device, $Type: typeid, preset, snapshot: string, seq_len: int) -> (model: ^gpt2.Model(Device, Type)) {
+	err: os.Error
+	start := time.now()
+	if preset != "" {
+		model, err = gpt2.load_huggingface(Device, Type, preset)
+		if err != nil {
+			fatal_error("Error loading preset %s: %v", preset, err)
+		}
+	} else {
+		model_file := data_file(snapshot, "snapshots")
+		defer delete(model_file)
+		model, err = gpt2.load_checkpoint(Device, Type, model_file)
+		if err != nil {
+			fatal_error("Error loading %s: %v", model_file, err)
+		}
+	}
+	if seq_len > model.max_seq {
+		fatal_error("requested seq_len=%d is greater than model max_seq=%d", seq_len, model.max_seq)
+	}
+	log.infof("time to load model = %.2fs ", time.duration_seconds(time.since(start)))
+	return model
+}
+
 // get named tokenizer
 new_tokenizer :: proc(name: string) -> nn.Tokenizer(u16) {
 	switch name {
@@ -136,16 +162,6 @@ new_tokenizer :: proc(name: string) -> nn.Tokenizer(u16) {
 	}
 }
 
-// read data from file unmarshal into value pointed to by ptr
-unmarshal_json_file :: proc(file_name: string, ptr: ^$T, allocator := context.allocator) -> os.Error {
-	data := os.read_entire_file_or_err(file_name) or_return
-	defer delete(data)
-	if err := json.unmarshal(data, ptr, allocator = allocator); err != nil {
-		log.panic(err)
-	}
-	return nil
-}
-
 round_ms :: proc(d: time.Duration) -> time.Duration {
 	return time.duration_round(d, time.Millisecond)
 }
@@ -154,24 +170,12 @@ round_sec :: proc(d: time.Duration) -> time.Duration {
 	return time.duration_round(d, time.Second)
 }
 
-make_dir_if_not_exist :: proc(name: string) {
-	if os.is_dir(name) {
-		return
-	}
-	if os.exists(name) {
-		log.panicf("%s is not a directory!", name)
-	}
-	if err := os.make_directory(name, 0o755); err != os.ERROR_NONE {
-		log.panicf("error creating %s dir: %v", name, err)
-	}
-}
-
 // Get file path as data/<subdir>/<name> creating dirs if needed
 data_file :: proc(name, subdir: string) -> string {
-	make_dir_if_not_exist("data")
+	util.make_dir_if_not_exist("data")
 	dir := filepath.join({"data", subdir})
 	defer delete(dir)
-	make_dir_if_not_exist(dir)
+	util.make_dir_if_not_exist(dir)
 	return filepath.join({dir, name})
 }
 
@@ -196,25 +200,18 @@ download_file :: proc(file, url: string) -> string {
 
 // fork curl process to download a file - will only work on Linux
 // if no system error then returns the status code from the curl child process
-http_get :: proc(url, file: string) -> (status: u32, err: os.Error) {
-	pid := os.fork() or_return
-	if pid == 0 {
-		os.execvp("curl", {"-#", "-L", "-f", "-o", file, url}) or_return
-	} else {
-		got_pid, child_status := wait_pid(pid) or_return
-		if got_pid < 0 || got_pid != pid {
-			return 0, .Unsupported
-		}
-		status = child_status / 256
-	}
-	return
+http_get :: proc(url, file: string) -> (status: i32, err: os.Error) {
+	status = util.system({"curl", "-#", "-L", "-f", "-o", file, url}) or_return
+	return status / 256, nil
 }
 
-wait_pid :: proc(pid: os.Pid) -> (os.Pid, u32, os.Error) {
-	rusage: linux.RUsage
-	opt: linux.Wait_Options
-	id := linux.Pid(pid)
-	status: u32
-	pid2, err := linux.wait4(id, &status, opt, &rusage)
-	return os.Pid(pid2), status, err
+max_device_memory_used :: proc($Device: typeid, buf: []u8) -> string {
+	when Device == Cuda {
+		dev := cuda.get_device()
+		used := cuda.get_mempool_attribute(dev, .USED_MEM_HIGH)
+		cuda.set_mempool_attribute(dev, .USED_MEM_HIGH, 0)
+		return fmt.bprintf(buf, "%d MB", used / (1024 * 1024))
+	} else {
+		return ""
+	}
 }
