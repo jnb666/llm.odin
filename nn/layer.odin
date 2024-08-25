@@ -12,7 +12,6 @@ import "../cudnn"
 import "../openblas"
 import "../util"
 
-USE_CUBLAS_DBIAS :: true
 
 // Parameter has array and optional associated gradient. If type is BF16 then also store copy in f32 format.
 Parameter :: struct($D, $T: typeid) where T == f32 || T == BF16 {
@@ -196,60 +195,28 @@ linear_backward_cuda :: proc(l: ^Linear(Cuda, $T), inp, dout, din: Array(Cuda, T
 	BT, C, OC := in_shape.dims[0], l.weight.dims[1], l.weight.dims[0]
 	alloc_grads(&l.layer)
 	// din = matmul(dout, weight)    [BT, OC] x [OC, C] => [BT, C]
-	err := cublas.gemm(dtype, .OP_N, .OP_N, array.ptr(dout), array.ptr(l.weight.arr), array.ptr(din), BT, C, OC)
+	doutp := array.ptr(dout)
+	err := cublas.gemm(dtype, .OP_N, .OP_N, doutp, array.ptr(l.weight.arr), array.ptr(din), BT, C, OC)
 	if err != nil {
 		log.panic("no cublas matmul algoritm found:", err, location = loc)
 	}
-	when USE_CUBLAS_DBIAS {
-		// optinal bias gradient
-		dbias: Array(Cuda, T)
-		have_bias := false
-		if l.bias != nil {
-			// fuse bias reduction with weight grad update
-			have_bias = true
-			dbias = array.zeros_like(l.bias.grad)
-		}
-		// dweight += matmul(dout.T, in)  [OC, BT] x [BT, C] => [OC, C]
-		err = cublas.gemm(
-			dtype,
-			.OP_T,
-			.OP_N,
-			array.ptr(dout),
-			array.ptr(inp),
-			array.ptr(l.weight.grad),
-			OC,
-			C,
-			BT,
-			beta = 1,
-			bias = array.ptr(dbias),
-			dbias = have_bias,
-		)
-		if err != nil {
-			log.panic("no cublas matmul algoritm found:", err, location = loc)
-		}
-		if have_bias {
-			add(l.bias.grad, dbias, l.bias.grad)
-			defer array.delete(dbias)
-		}
-	} else {
-		// dweight += matmul(dout.T, in)  [OC, BT] x [BT, C] => [OC, C]
-		err = cublas.gemm(dtype, .OP_T, .OP_N, array.ptr(dout), array.ptr(inp), array.ptr(l.weight.grad), OC, C, BT, beta = 1)
-		if err != nil {
-			log.panic("no cublas matmul algoritm found:", err, location = loc)
-		}
-		if l.bias != nil {
-			// separate bias reduction
-			assert(OC % 32 == 0, "output channels must be divisible by 32 for backward bias kernel", loc)
-			when T == BF16 {
-				fn := cuda.get_function("matmul_backward_bias_bf16")
-			} else {
-				fn := cuda.get_function("matmul_backward_bias_f32")
-			}
-			dbias, doutput := array.ptr(l.bias.grad), array.ptr(dout)
-			bt, oc := i32(BT), i32(OC)
-			BLOCK := 512
-			cuda.launch_kernel(fn, gridX = OC / 32, blockX = BLOCK, sharedMemBytes = BLOCK * 4, params = {&dbias, &doutput, &bt, &oc})
-		}
+	// optinal bias gradient
+	dbias: Array(Cuda, T)
+	have_bias := false
+	if l.bias != nil {
+		// fuse bias reduction with weight grad update
+		have_bias = true
+		dbias = array.zeros_like(l.bias.grad)
+	}
+	// dweight += matmul(dout.T, in)  [OC, BT] x [BT, C] => [OC, C]
+	dweight := array.ptr(l.weight.grad)
+	err = cublas.gemm(dtype, .OP_T, .OP_N, doutp, array.ptr(inp), dweight, OC, C, BT, beta = 1, bias = array.ptr(dbias), dbias = have_bias)
+	if err != nil {
+		log.panic("no cublas matmul algoritm found:", err, location = loc)
+	}
+	if have_bias {
+		add(l.bias.grad, dbias, l.bias.grad)
+		array.delete(dbias)
 	}
 }
 
@@ -471,8 +438,8 @@ layernorm_forward_cuda :: proc(l: ^Layernorm(Cuda, BF16), inp, out: Array(Cuda, 
 
 layernorm_fwd_init_cuda :: proc(N, C: int, loc := #caller_location) -> cudnn.BackendDescriptor {
 	log.debugf("init layernorm fwd: N=%d C=%d", N, C, location = loc)
-	x := cudnn.tensor_descriptor('x', {N, C, 1, 1}, {C, 1, 1, 1}, dtype = .BFLOAT16)
-	y := cudnn.tensor_descriptor('y', {N, C, 1, 1}, {C, 1, 1, 1}, dtype = .BFLOAT16)
+	x := cudnn.tensor_descriptor('x', {N, C, 1, 1}, dtype = .BFLOAT16)
+	y := cudnn.tensor_descriptor('y', {N, C, 1, 1}, dtype = .BFLOAT16)
 	scale := cudnn.tensor_descriptor('s', {1, C, 1, 1}, dtype = .BFLOAT16)
 	bias := cudnn.tensor_descriptor('b', {1, C, 1, 1}, dtype = .BFLOAT16)
 	mean := cudnn.tensor_descriptor('m', {N, 1, 1, 1}, dtype = .BFLOAT16)
@@ -572,9 +539,9 @@ layernorm_backward_cuda :: proc(l: ^Layernorm(Cuda, BF16), inp, dout, din: Array
 
 layernorm_bwd_init_cuda :: proc(N, C: int, loc := #caller_location) -> cudnn.BackendDescriptor {
 	log.debugf("init layernorm bwd: N=%d C=%d", N, C, location = loc)
-	x := cudnn.tensor_descriptor('i', {N, C, 1, 1}, {C, 1, 1, 1}, dtype = .BFLOAT16)
-	dy := cudnn.tensor_descriptor('y', {N, C, 1, 1}, {C, 1, 1, 1}, dtype = .BFLOAT16)
-	dx := cudnn.tensor_descriptor('x', {N, C, 1, 1}, {C, 1, 1, 1}, dtype = .BFLOAT16)
+	x := cudnn.tensor_descriptor('i', {N, C, 1, 1}, dtype = .BFLOAT16)
+	dy := cudnn.tensor_descriptor('y', {N, C, 1, 1}, dtype = .BFLOAT16)
+	dx := cudnn.tensor_descriptor('x', {N, C, 1, 1}, dtype = .BFLOAT16)
 	scale := cudnn.tensor_descriptor('w', {1, C, 1, 1}, dtype = .BFLOAT16)
 	dscale := cudnn.tensor_descriptor('s', {1, C, 1, 1}, dtype = .BFLOAT16)
 	dbias := cudnn.tensor_descriptor('b', {1, C, 1, 1}, dtype = .BFLOAT16)

@@ -1,12 +1,10 @@
 package gpt2
 
-import "core:encoding/json"
 import "core:log"
 import "core:os"
 import "core:strings"
 
 import "../array"
-import "../nn"
 import "../safetensors"
 import "../util"
 
@@ -85,7 +83,6 @@ huggingface_load_weights :: proc(model: ^Model($D, $T), model_name: string) -> s
 		if len(l.params) > 0 {
 			assert(len(l.params) == len(hf_wmap[l.name]))
 			for name, i in hf_wmap[l.name] {
-				//log.debug("load", name)
 				p := l.params[i].arr
 				if name == "wte.weight" {
 					p = array.view(p, {model.vocab_size, p.dims[1]})
@@ -93,19 +90,18 @@ huggingface_load_weights :: proc(model: ^Model($D, $T), model_name: string) -> s
 				safetensors.read(file, name, p) or_return
 			}
 		}
-		for l in l.layers {
-			if len(l.params) > 0 {
-				ix, lname := cut(l.name)
-				assert(len(l.params) == len(hf_bmap[lname]))
+		for l2 in l.layers {
+			if len(l2.params) > 0 {
+				ix, lname := cut(l2.name)
+				assert(len(l2.params) == len(hf_bmap[lname]))
 				for name, i in hf_bmap[lname] {
 					key := strings.join({"h", ix, name}, ".")
-					//log.debug("load", key)
 					transpose := false
 					if strings.has_suffix(key, ".T") {
 						key = key[:len(key) - 2]
 						transpose = true
 					}
-					safetensors.read(file, key, l.params[i].arr, transpose) or_return
+					safetensors.read(file, key, l2.params[i].arr, transpose) or_return
 					delete(key)
 				}
 			}

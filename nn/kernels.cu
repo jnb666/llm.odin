@@ -99,59 +99,6 @@ __global__ void add_bf16(bfloat2* out, const bfloat2* x, const bfloat2* y, size_
 	}
 }
 
-// this kernel performs a column-wise reduction over dout, in PyTorch equivalent to:
-// dbias = dout.sum((0,1))
-// the idea is to employ one block to reduce along several columns,
-// where each block has a width of 32 columns to ensure coalesced access.
-// at the end we accumulate the reductions performed by the warps in each block via shared memory
-__global__ void matmul_backward_bias_f32(float* dbias, const float* dout, int BT, int OC) {
-    extern __shared__ float smem[];
-    const int warp_id = threadIdx.x / warpSize;
-    const int lane_id = threadIdx.x % warpSize;
-    const int tl = blockIdx.x * warpSize;
-    const int vstep = blockDim.x / warpSize;
-
-    const float* dout_col = dout + tl + lane_id;
-    float dout_sum = 0.0f;
-    for (int row = warp_id; row < BT; row += vstep) {
-        dout_sum += (float)dout_col[row * OC];
-    }
-    smem[lane_id + warp_id * warpSize] = dout_sum;
-    __syncthreads();
-
-    dout_sum = 0.0f;
-    if (warp_id == 0) {
-        for (int j = 0; j < vstep; j++) {
-            dout_sum += smem[lane_id + j*warpSize];
-        }
-        dbias[tl + lane_id] += dout_sum;
-    }
-}
-
-__global__ void matmul_backward_bias_bf16(bfloat* dbias, const bfloat* dout, int BT, int OC) {
-    extern __shared__ float smem[];
-    const int warp_id = threadIdx.x / warpSize;
-    const int lane_id = threadIdx.x % warpSize;
-    const int tl = blockIdx.x * warpSize;
-    const int vstep = blockDim.x / warpSize;
-
-    const bfloat* dout_col = dout + tl + lane_id;
-    float dout_sum = 0.0f;
-    for (int row = warp_id; row < BT; row += vstep) {
-        dout_sum += (float)dout_col[row * OC];
-    }
-    smem[lane_id + warp_id * warpSize] = dout_sum;
-    __syncthreads();
-
-    dout_sum = 0.0f;
-    if (warp_id == 0) {
-        for (int j = 0; j < vstep; j++) {
-            dout_sum += smem[lane_id + j*warpSize];
-        }
-        dbias[tl + lane_id] += dout_sum;
-    }
-}
-
 #define gelu_scale 0.797884560802865f
 
 __global__ void gelu_bf16(const bfloat* in, bfloat* out, size_t N) {

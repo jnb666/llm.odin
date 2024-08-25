@@ -6,7 +6,6 @@ import "core:slice"
 import "core:testing"
 
 import "../nn"
-import "../util"
 
 
 @(test)

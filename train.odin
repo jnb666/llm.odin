@@ -6,7 +6,6 @@ import "core:os"
 import "core:strings"
 import "core:time"
 
-import "array"
 import "gpt2"
 import "nn"
 import "plot"

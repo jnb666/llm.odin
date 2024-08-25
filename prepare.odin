@@ -4,7 +4,6 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:log"
 import "core:mem/virtual"
-import "core:os"
 import "core:strings"
 
 import "nn"
@@ -184,11 +183,11 @@ tokenize_jsonl :: proc(tok: ^nn.Tokenizer(u16), data: string, cfg: Dataset_Confi
 		for key, val in root {
 			r[key] = fmt.aprint(val, allocator = context.temp_allocator)
 		}
-		text := util.parse_template(cfg.template, r, allocator = context.temp_allocator)
+		parsed := util.parse_template(cfg.template, r, allocator = context.temp_allocator)
 		if cfg.trim_space {
-			text = strings.trim_space(text)
+			parsed = strings.trim_space(parsed)
 		}
-		nn.encode_to(tok, text, &tokens)
+		nn.encode_to(tok, parsed, &tokens)
 		append(&tokens, ..sep)
 		if n % 1000 == 0 {
 			fmt.printf("\rtokenize record %d - %.0f%% done", n, 100 * f64(done) / f64(length))

@@ -8,7 +8,6 @@ import "core:time"
 
 import "gpt2"
 import "nn"
-import "util"
 
 
 Generate_Options :: struct {

@@ -9,7 +9,6 @@ import "core:log"
 import "core:math"
 import "core:mem"
 import "core:os"
-import "core:path/filepath"
 import "core:slice"
 import "core:strings"
 
@@ -60,11 +59,11 @@ do_cmd :: proc(command: string, stdout: ^[]byte) -> (output: string, status: i32
 	read_buffer: [80]byte
 	index: int
 	for fgets(&read_buffer[0], size_of(read_buffer), fp) != nil {
-		read := bytes.index_byte(read_buffer[:], 0)
-		defer index += cast(int)read
-		if read > 0 && index + cast(int)read <= len(stdout) {
-			mem.copy(&stdout[index], &read_buffer[0], cast(int)read)
+		n := bytes.index_byte(read_buffer[:], 0)
+		if n > 0 && index + n <= len(stdout) {
+			mem.copy(&stdout[index], &read_buffer[0], n)
 		}
+		index += n
 	}
 	return string(stdout[:index]), pclose(fp), nil
 }
@@ -88,7 +87,7 @@ huggingface_cache_file :: proc(model_name, file_name: string) -> (string, os.Err
 
 // Location for cache data - e.g. /home/user/.cache on linux
 // allocates a new string
-user_cache_dir :: proc() -> (dir: string, ok: bool) {
+user_cache_dir :: proc() -> (string, bool) {
 	when ODIN_OS == .Windows {
 		if cdir, ok := os.lookup_env("LocalAppData"); ok {
 			return cdir, true

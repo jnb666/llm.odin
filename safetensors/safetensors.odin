@@ -2,7 +2,6 @@ package safetensors
 
 import "core:encoding/json"
 import "core:io"
-import "core:log"
 import "core:math"
 import "core:mem/virtual"
 import "core:os"
@@ -10,7 +9,6 @@ import "core:slice"
 import "core:sys/linux"
 
 import "../array"
-import "../util"
 
 Error :: union #shared_nil {
 	os.Error,

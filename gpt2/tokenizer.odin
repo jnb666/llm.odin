@@ -3,14 +3,12 @@ package gpt2
 import "core:bytes"
 import "core:encoding/json"
 import "core:log"
-import "core:os"
 import "core:slice"
 import "core:strings"
 import "core:unicode"
 import "core:unicode/utf8"
 
 import "../nn"
-import "../util"
 
 End_Token :: "<|endoftext|>"
 

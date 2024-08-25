@@ -140,13 +140,13 @@ add :: proc(s: ^Stats, name: string, x: int, y: f32, width := 2, opacity := 1.0)
 
 // Add text sample - makes a copy of the input text
 add_sample :: proc(s: ^Stats, step: int, text: string) {
-	text := strings.clone(text)
-	end := len(text)
-	if n := strings.index_byte(text, '\n'); n > 0 {
+	txt := strings.clone(text)
+	end := len(txt)
+	if n := strings.index_byte(txt, '\n'); n > 0 {
 		end = n
 	}
 	end = min(end, Max_Line_Length)
-	append(&s.samples, Sample{step = step, preview = text[:end], text = text})
+	append(&s.samples, Sample{step = step, preview = txt[:end], text = txt})
 }
 
 webview_thread :: proc(c: ^Context) {

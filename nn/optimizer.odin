@@ -22,8 +22,8 @@ decay_learning_rate :: proc(c: ^Cosine_Decay, step: int, learning_rate: ^f32) {
 		frac := f32(step) / f32(c.warmup_steps)
 		learning_rate^ = c.initial_rate * (1 - frac) + c.warmup_target * frac
 	} else {
-		step := min(step - c.warmup_steps, c.decay_steps)
-		decay := f32(0.5 * (1 + math.cos(math.PI * f32(step) / f32(c.decay_steps))))
+		dstep := min(step - c.warmup_steps, c.decay_steps)
+		decay := f32(0.5 * (1 + math.cos(math.PI * f32(dstep) / f32(c.decay_steps))))
 		rmax := c.warmup_steps > 0 ? c.warmup_target : c.initial_rate
 		learning_rate^ = c.final_rate + (rmax - c.final_rate) * decay
 	}

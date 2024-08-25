@@ -4,12 +4,10 @@ import "core:fmt"
 import "core:log"
 import "core:math"
 import "core:mem"
-import "core:os"
 import "core:strings"
 
 import "../array"
 import "../nn"
-import "../util"
 
 Array :: array.Array
 BF16 :: array.BF16

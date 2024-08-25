@@ -5,8 +5,6 @@ import "core:fmt"
 import "core:io"
 import "core:slice"
 
-import "../util"
-
 // Parameters for array format summarization
 Edgeitems: int = 5
 Threshold: int = 100

@@ -1,6 +1,5 @@
 package nn
 
-import "core:io"
 import "core:log"
 import "core:math/rand"
 import "core:os"
